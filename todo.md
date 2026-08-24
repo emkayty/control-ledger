@@ -1,0 +1,24 @@
+# Project TODO
+
+- [x] Define the Release 1 domain schema for organisations, branches, scoped memberships, customers, obligations, observations, settlement evidence, exceptions, files, audit events, and idempotency records.
+- [x] Apply the database migration for the Release 1 schema and verify that the database structure matches the Drizzle definitions.
+- [x] Verify the applied database schema against the Drizzle definitions by checking Release 1 control tables and key uniqueness indexes in the live database.
+- [x] Implement tenant- and branch-bound access helpers and protected APIs for role-aware control workflows.
+- [x] Implement append-only receivable, payment-observation, settlement-evidence, audit, and correction records using exact minor-unit money values and correlation IDs.
+- [x] Implement linked, append-only receivable and evidence correction APIs that preserve the original record and record a correction reference, reason, actor, and correlation ID.
+- [x] Implement secure evidence-file upload metadata and controlled retrieval using managed object storage rather than database blobs.
+- [x] Validate linked evidence-event and exception ownership before storing evidence-file metadata, and test cross-tenant or cross-branch link rejection.
+- [x] Implement deterministic reconciliation for exact, partial, short, duplicate, delayed, and unmatched evidence, preserving rule and source provenance.
+- [x] Verify the full reconciliation taxonomy in the live schema and interface, including distinct partial-payment and short-payment review outcomes.
+- [x] Implement approval-aware exception lifecycle APIs with type, severity, value impact, owner, due date, notes, evidence references, and resolution history.
+- [x] Add visible exception note history and note entry controls to the responsive investigation view.
+- [x] Add explicit loading and recovery states to receivables, evidence, and exceptions views.
+- [x] Build a polished mobile-first dashboard showing scoped position, reconciliation coverage, priority exceptions, status language, and drill-down paths.
+- [x] Build responsive customer, receivable, evidence-intake, reconciliation, and exception-control views with loading, empty, error, and success states.
+- [x] Create a premium responsive application shell with accessible navigation, mobile drawer behaviour, visible focus states, and role-aware page affordances.
+- [ ] Add integration tests for idempotent material actions, reconciliation mutations, approval control, and append-only correction APIs.
+- [x] Add a tRPC integration-style test for authenticated protected workspace access and scoped response shaping without writing artificial business records.
+- [x] Add isolated protected-scope procedure tests that verify allowed roles and fail-closed unauthorised membership outcomes without inserting operational test data.
+- [ ] Conduct authenticated dashboard, receivables, evidence, reconciliation, and exceptions smoke tests using user-owned workspace data on desktop and mobile; then inspect runtime logs.
+- [x] Produce the Release 1 readiness summary.
+- [ ] Create the final project checkpoint and provide the project version to the user.

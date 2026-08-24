@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1787593969188,
+      "tag": "0000_tricky_selene",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787594193554,
+      "tag": "0001_married_lethal_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787595085935,
+      "tag": "0002_uneven_cloak",
+      "breakpoints": true
+    }
+  ]
 }

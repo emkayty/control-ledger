@@ -1,0 +1,1 @@
+ALTER TABLE `controlExceptions` MODIFY COLUMN `type` enum('partial_payment','short_payment','duplicate_input','delayed_settlement','unmatched_record','source_conflict','invalid_intake') NOT NULL;

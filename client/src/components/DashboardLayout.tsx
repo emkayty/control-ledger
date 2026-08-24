@@ -1,262 +1,72 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
-import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
-import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+import { ControlScopeProvider } from "@/contexts/ControlScopeContext";
+import type { ControlScope } from "@/lib/control";
+import { trpc } from "@/lib/trpc";
+import { AlertTriangle, ArrowUpRight, Building2, ChevronDown, CircleUserRound, FileCheck2, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { Skeleton } from "./ui/skeleton";
+import { toast } from "sonner";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+const navigation = [
+  { href: "/", label: "Control desk", icon: LayoutDashboard },
+  { href: "/receivables", label: "Receivables", icon: ReceiptText },
+  { href: "/evidence", label: "Evidence intake", icon: FileCheck2 },
+  { href: "/exceptions", label: "Exceptions", icon: AlertTriangle },
 ];
 
-const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 280;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 480;
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
-  });
-  const { loading, user } = useAuth();
-
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
-  }, [sidebarWidth]);
-
-  if (loading) {
-    return <DashboardLayoutSkeleton />
-  }
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
-            </p>
-          </div>
-          <Button
-            onClick={() => startLogin()}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            Sign in
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": `${sidebarWidth}px`,
-        } as CSSProperties
-      }
-    >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
-        {children}
-      </DashboardLayoutContent>
-    </SidebarProvider>
-  );
+function Navigation({ onNavigate }: { onNavigate?: () => void }) {
+  const [location] = useLocation();
+  return <nav className="space-y-1 px-3 py-4" aria-label="Primary navigation">
+    {navigation.map(item => {
+      const Icon = item.icon; const active = location === item.href;
+      return <Link key={item.href} href={item.href} onClick={onNavigate} className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold transition-colors ${active ? "bg-white/12 text-white shadow-sm" : "text-slate-300 hover:bg-white/7 hover:text-white"}`}>
+        <Icon className="size-[18px]" /><span>{item.label}</span>{active ? <span className="ml-auto size-1.5 rounded-full bg-teal-300" /> : null}
+      </Link>;
+    })}
+  </nav>;
 }
 
-type DashboardLayoutContentProps = {
-  children: React.ReactNode;
-  setSidebarWidth: (width: number) => void;
-};
+function Brand() { return <div className="flex items-center gap-3 px-5 py-6"><div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-teal-200 to-cyan-400 text-slate-950 shadow-lg shadow-cyan-900/30"><ShieldCheck className="size-5" /></div><div><p className="text-sm font-extrabold tracking-tight text-white">Control Ledger</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-teal-200/70">Operations control</p></div></div>; }
 
-function DashboardLayoutContent({
-  children,
-  setSidebarWidth,
-}: DashboardLayoutContentProps) {
-  const { user, logout } = useAuth();
-  const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
-  const isCollapsed = state === "collapsed";
-  const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
-  const isMobile = useIsMobile();
+function WorkspaceSetup() {
+  const [organisationName, setOrganisationName] = useState("");
+  const [branchName, setBranchName] = useState("Main branch");
+  const utils = trpc.useUtils();
+  const bootstrap = trpc.control.workspace.bootstrap.useMutation({ onSuccess: () => { toast.success("Your control workspace is ready."); utils.control.workspace.list.invalidate(); }, onError: error => toast.error(error.message) });
+  return <main className="surface-grid min-h-screen bg-[#f6faf9] px-5 py-6 sm:grid sm:place-items-center"><section className="rise-in soft-card w-full max-w-2xl overflow-hidden rounded-[2rem] border bg-white">
+    <div className="bg-[#071d22] p-7 text-white sm:p-10"><div className="mb-7 grid size-12 place-items-center rounded-2xl bg-teal-300 text-[#071d22]"><Sparkles className="size-6" /></div><p className="text-xs font-extrabold uppercase tracking-[0.16em] text-teal-200">Release 1 workspace</p><h1 className="mt-3 max-w-md text-3xl font-extrabold tracking-tight sm:text-4xl">Start with one accountable control scope.</h1><p className="mt-4 max-w-lg text-sm leading-6 text-slate-300">Create your first organisation and branch. All records created afterwards remain scoped, attributed, and traceable.</p></div>
+    <form className="space-y-5 p-7 sm:p-10" onSubmit={event => { event.preventDefault(); bootstrap.mutate({ organisationName, branchName }); }}><div className="grid gap-5 sm:grid-cols-2"><label className="grid gap-2 text-sm font-bold">Organisation name<Input required minLength={2} value={organisationName} onChange={event => setOrganisationName(event.target.value)} placeholder="e.g. Aster Distribution" /></label><label className="grid gap-2 text-sm font-bold">First branch<Input required minLength={2} value={branchName} onChange={event => setBranchName(event.target.value)} /></label></div><div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-sm text-xs leading-5 text-muted-foreground">The workspace owner can later add controllers, operators, managers, and approvers through governed access workflows.</p><Button type="submit" size="lg" disabled={bootstrap.isPending} className="rounded-xl bg-teal-700 px-5 font-extrabold hover:bg-teal-800">{bootstrap.isPending ? "Creating workspace…" : "Create control workspace"}<ArrowUpRight className="ml-2 size-4" /></Button></div></form>
+  </section></main>;
+}
 
-  useEffect(() => {
-    if (isCollapsed) {
-      setIsResizing(false);
-    }
-  }, [isCollapsed]);
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading, logout } = useAuth();
+  const workspaceQuery = trpc.control.workspace.list.useQuery(undefined, { enabled: Boolean(user) });
+  const [selectedOrganisationId, setSelectedOrganisationId] = useState("");
+  const [selectedBranchId, setSelectedBranchId] = useState("");
+  const organisationIds = useMemo(() => Array.from(new Set((workspaceQuery.data?.memberships ?? []).map(item => item.organisationId))), [workspaceQuery.data?.memberships]);
+  const selectedOrganisation = selectedOrganisationId || organisationIds[0] || "";
+  const availableBranches = (workspaceQuery.data?.branches ?? []).filter(branch => branch.organisationId === selectedOrganisation);
+  const selectedBranch = selectedBranchId || availableBranches[0]?.id || "";
+  const membership = (workspaceQuery.data?.memberships ?? []).find(item => item.organisationId === selectedOrganisation && (item.branchId === selectedBranch || item.branchId === null));
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
+  useEffect(() => { if (selectedOrganisation && !selectedBranchId && availableBranches[0]) setSelectedBranchId(availableBranches[0].id); }, [selectedOrganisation, selectedBranchId, availableBranches]);
 
-      const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
-      const newWidth = e.clientX - sidebarLeft;
-      if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
-        setSidebarWidth(newWidth);
-      }
-    };
+  if (loading || workspaceQuery.isLoading) return <div className="min-h-screen bg-[#f6faf9] p-6 sm:p-10"><div className="mx-auto max-w-6xl space-y-5"><Skeleton className="h-14 w-64 rounded-2xl" /><Skeleton className="h-40 w-full rounded-3xl" /><div className="grid gap-4 md:grid-cols-3"><Skeleton className="h-32 rounded-3xl" /><Skeleton className="h-32 rounded-3xl" /><Skeleton className="h-32 rounded-3xl" /></div></div></div>;
+  if (!user) return <main className="surface-grid grid min-h-screen place-items-center bg-[#f6faf9] p-5"><section className="soft-card w-full max-w-md rounded-[2rem] border bg-white p-8 text-center"><div className="mx-auto grid size-12 place-items-center rounded-2xl bg-teal-50 text-teal-700"><ShieldCheck className="size-6" /></div><h1 className="mt-6 text-2xl font-extrabold tracking-tight">A clear view of what needs attention.</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Sign in to work with scoped receivables, evidence, and exceptions.</p><Button onClick={() => startLogin()} className="mt-7 w-full rounded-xl bg-teal-700 font-bold hover:bg-teal-800">Sign in to Control Ledger</Button></section></main>;
+  if (workspaceQuery.isError) return <main className="grid min-h-screen place-items-center p-5"><section className="max-w-md rounded-3xl border bg-card p-7 text-center"><AlertTriangle className="mx-auto size-6 text-rose-600" /><h1 className="mt-4 font-extrabold">Workspace information is unavailable</h1><p className="mt-2 text-sm text-muted-foreground">{workspaceQuery.error.message}</p><Button variant="outline" className="mt-5" onClick={() => workspaceQuery.refetch()}>Try again</Button></section></main>;
+  if (!workspaceQuery.data?.memberships.length || !selectedOrganisation || !selectedBranch || !membership) return <WorkspaceSetup />;
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    }
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [isResizing, setSidebarWidth]);
-
-  return (
-    <>
-      <div className="relative" ref={sidebarRef}>
-        <Sidebar
-          collapsible="icon"
-          className="border-r-0"
-          disableTransition={isResizing}
-        >
-          <SidebarHeader className="h-16 justify-center">
-            <div className="flex items-center gap-3 px-2 transition-all w-full">
-              <button
-                onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
-                aria-label="Toggle navigation"
-              >
-                <PanelLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent className="gap-0">
-            <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
-                const isActive = location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
-                      className={`h-10 transition-all font-normal`}
-                    >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                      />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarContent>
-
-          <SidebarFooter className="p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
-                    <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none">
-                      {user?.name || "-"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
-                    </p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarFooter>
-        </Sidebar>
-        <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
-          onMouseDown={() => {
-            if (isCollapsed) return;
-            setIsResizing(true);
-          }}
-          style={{ zIndex: 50 }}
-        />
-      </div>
-
-      <SidebarInset>
-        {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        <main className="flex-1 p-4">{children}</main>
-      </SidebarInset>
-    </>
-  );
+  const scope: ControlScope = { organisationId: selectedOrganisation, branchId: selectedBranch, organisationName: membership.organisationName, branchName: availableBranches.find(branch => branch.id === selectedBranch)?.name ?? "Branch", role: membership.role };
+  return <ControlScopeProvider scope={scope}><div className="min-h-screen bg-[#f6faf9] lg:flex">
+    <aside className="hidden min-h-screen w-64 shrink-0 bg-[#071d22] lg:block"><Brand /><Navigation /><div className="absolute bottom-5 w-64 px-4"><div className="rounded-2xl border border-white/8 bg-white/5 p-3 text-xs text-slate-300"><p className="font-extrabold text-white">Immutable by default</p><p className="mt-1 leading-5">Every material action carries an actor and correlation trail.</p></div></div></aside>
+    <div className="min-w-0 flex-1"><header className="sticky top-0 z-30 border-b border-slate-200/80 bg-[#f6faf9]/92 backdrop-blur-xl"><div className="flex h-[72px] items-center gap-3 px-4 sm:px-6"><Sheet><SheetTrigger asChild><Button variant="outline" size="icon" className="rounded-xl lg:hidden"><Menu className="size-5" /><span className="sr-only">Open navigation</span></Button></SheetTrigger><SheetContent side="left" className="w-72 border-0 bg-[#071d22] p-0 text-white"><Brand /><Navigation /></SheetContent></Sheet><div className="min-w-0 flex-1"><p className="hidden text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground sm:block">Scoped workspace</p><div className="flex items-center gap-2"><Building2 className="size-4 text-teal-700" /><span className="truncate text-sm font-extrabold">{scope.organisationName}</span></div></div><div className="hidden items-center gap-2 md:flex"><select value={selectedOrganisation} onChange={event => { setSelectedOrganisationId(event.target.value); setSelectedBranchId(""); }} className="h-10 max-w-44 rounded-xl border bg-white px-3 text-xs font-bold outline-none"><option value={selectedOrganisation}>{scope.organisationName}</option></select><select value={selectedBranch} onChange={event => setSelectedBranchId(event.target.value)} className="h-10 max-w-40 rounded-xl border bg-white px-3 text-xs font-bold outline-none">{availableBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div><div className="flex items-center gap-2 rounded-xl border bg-white py-1.5 pl-2 pr-3"><div className="grid size-7 place-items-center rounded-lg bg-slate-100 text-slate-600"><CircleUserRound className="size-4" /></div><div className="hidden max-w-32 sm:block"><p className="truncate text-xs font-extrabold">{user.name ?? "Account"}</p><p className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{scope.role}</p></div><button onClick={logout} className="ml-1 text-muted-foreground hover:text-rose-600" aria-label="Sign out"><LogOut className="size-4" /></button></div></div></header>
+      <main className="surface-grid min-h-[calc(100vh-72px)] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+    </div>
+  </div></ControlScopeProvider>;
 }
