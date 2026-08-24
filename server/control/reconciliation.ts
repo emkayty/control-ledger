@@ -1,4 +1,4 @@
-import { compareMinor, subtractMinor } from "./money";
+import { compareMinor, minimumMinor, remainingMinor, subtractMinor } from "./money";
 
 export type ReconciliationOutcome = {
   matchType: "exact" | "partial" | "short" | "duplicate" | "delayed" | "manual_review";
@@ -7,6 +7,21 @@ export type ReconciliationOutcome = {
   unresolvedMinor: string;
   exceptionType?: "partial_payment" | "short_payment" | "duplicate_input" | "delayed_settlement" | "unmatched_record";
 };
+
+export function calculateAvailableAllocation(input: {
+  obligationMinor: string;
+  observedMinor: string;
+  alreadyAllocatedToObligation: string;
+  alreadyAllocatedFromEvidence: string;
+}) {
+  const obligationRemainingMinor = remainingMinor(input.obligationMinor, input.alreadyAllocatedToObligation);
+  const evidenceRemainingMinor = remainingMinor(input.observedMinor, input.alreadyAllocatedFromEvidence);
+  return {
+    obligationRemainingMinor,
+    evidenceRemainingMinor,
+    allocatableMinor: minimumMinor(obligationRemainingMinor, evidenceRemainingMinor),
+  };
+}
 
 export function determineReconciliation(input: {
   obligationMinor: string;

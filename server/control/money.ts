@@ -26,3 +26,16 @@ export function compareMinor(left: string, right: string) {
 export function subtractMinor(left: string, right: string) {
   return (BigInt(left) - BigInt(right)).toString();
 }
+
+export function addMinor(left: string, right: string) {
+  return (BigInt(left) + BigInt(right)).toString();
+}
+
+export function minimumMinor(left: string, right: string) {
+  return compareMinor(left, right) <= 0 ? left : right;
+}
+
+export function remainingMinor(total: string, alreadyAllocated: string) {
+  const remaining = BigInt(total) - BigInt(alreadyAllocated);
+  return (remaining > BigInt(0) ? remaining : BigInt(0)).toString();
+}

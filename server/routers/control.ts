@@ -21,7 +21,7 @@ import {
 import { requireScopedMembership, permissions } from "../control/access";
 import { assertEvidenceFileInput, assertEvidenceLinkScope } from "../control/fileSecurity";
 import { assertMinorAmount, isMinorAmount } from "../control/money";
-import { determineReconciliation } from "../control/reconciliation";
+import { calculateAvailableAllocation, determineReconciliation } from "../control/reconciliation";
 import { getDb } from "../db";
 import { storageGet, storagePut } from "../storage";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -411,9 +411,10 @@ export const controlRouter = router({
         db.select().from(reconciliationLinks).where(eq(reconciliationLinks.organisationId, input.organisationId)),
       ]);
       return events.map(event => {
-        const link = links.find(item => item.evidenceEventId === event.id);
-        const controlStatus = link ? (link.matchType === "exact" ? "matched" : "unresolved") : event.status;
-        return { ...event, controlStatus, reconciliation: link ?? null };
+        const eventLinks = links.filter(item => item.evidenceEventId === event.id);
+        const allocatedMinor = eventLinks.reduce((sum, link) => sum + BigInt(link.allocatedMinor), BigInt(0));
+        const controlStatus = eventLinks.length ? (allocatedMinor >= BigInt(event.amountMinor ?? "0") ? "matched" : "unresolved") : event.status;
+        return { ...event, controlStatus, reconciliation: eventLinks, allocatedMinor: allocatedMinor.toString() };
       });
     }),
     intake: protectedProcedure
@@ -521,6 +522,10 @@ export const controlRouter = router({
         const [evidence] = await db.select().from(evidenceEvents).where(and(eq(evidenceEvents.id, input.evidenceEventId), eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, input.branchId))).limit(1);
         if (!obligation || !evidence || !evidence.amountMinor || evidence.currency !== obligation.currency) throw new TRPCError({ code: "BAD_REQUEST", message: "An in-scope, same-currency obligation and monetary evidence event are required." });
         const existing = await db.select({ id: reconciliationLinks.id }).from(reconciliationLinks).where(and(eq(reconciliationLinks.obligationId, obligation.id), eq(reconciliationLinks.evidenceEventId, evidence.id))).limit(1);
+        const relatedLinks = await db.select({ obligationId: reconciliationLinks.obligationId, evidenceEventId: reconciliationLinks.evidenceEventId, allocatedMinor: reconciliationLinks.allocatedMinor }).from(reconciliationLinks).where(and(eq(reconciliationLinks.organisationId, input.organisationId), or(eq(reconciliationLinks.obligationId, obligation.id), eq(reconciliationLinks.evidenceEventId, evidence.id))));
+        const alreadyAllocatedToObligation = relatedLinks.filter(link => link.obligationId === obligation.id).reduce((sum, link) => sum + BigInt(link.allocatedMinor), BigInt(0)).toString();
+        const alreadyAllocatedFromEvidence = relatedLinks.filter(link => link.evidenceEventId === evidence.id).reduce((sum, link) => sum + BigInt(link.allocatedMinor), BigInt(0)).toString();
+        const allocation = calculateAvailableAllocation({ obligationMinor: String(obligation.amountMinor), observedMinor: String(evidence.amountMinor), alreadyAllocatedToObligation, alreadyAllocatedFromEvidence });
         return getOrCreateIdempotent({
           organisationId: input.organisationId, userId: ctx.user.id, action: "reconciliation.run", idempotencyKey: input.idempotencyKey, request: input,
           execute: async () => {
@@ -532,14 +537,17 @@ export const controlRouter = router({
               });
               return { entityId, correlationId };
             }
+            if (allocation.allocatableMinor === "0") {
+              throw new TRPCError({ code: "CONFLICT", message: "No unallocated balance remains for this evidence-obligation pair." });
+            }
             const delayed = Boolean(obligation.dueAt && evidence.occurredAt && evidence.occurredAt > obligation.dueAt);
-            const outcome = determineReconciliation({ obligationMinor: String(obligation.amountMinor), observedMinor: String(evidence.amountMinor), hasExistingLink: false, delayed, shortPayment: input.treatAsShort });
+            const outcome = determineReconciliation({ obligationMinor: allocation.obligationRemainingMinor, observedMinor: allocation.evidenceRemainingMinor, hasExistingLink: false, delayed, shortPayment: input.treatAsShort });
             await db.transaction(async tx => {
-              await tx.insert(reconciliationLinks).values({ id: entityId, organisationId: input.organisationId, obligationId: obligation.id, evidenceEventId: evidence.id, allocatedMinor: outcome.allocatedMinor, currency: obligation.currency, matchType: outcome.matchType, ruleVersion: "release-1.0", createdByUserId: ctx.user.id, correlationId });
+              await tx.insert(reconciliationLinks).values({ id: entityId, organisationId: input.organisationId, obligationId: obligation.id, evidenceEventId: evidence.id, allocatedMinor: outcome.allocatedMinor, currency: obligation.currency, matchType: outcome.matchType, ruleVersion: "release-1.1", createdByUserId: ctx.user.id, correlationId });
               if (outcome.exceptionType) {
                 await tx.insert(controlExceptions).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, obligationId: obligation.id, evidenceEventId: evidence.id, type: outcome.exceptionType, severity: outcome.exceptionType === "short_payment" ? "high" : "medium", title: `Reconciliation requires review: ${outcome.exceptionType.replaceAll("_", " ")}`, valueImpactMinor: outcome.unresolvedMinor, currency: obligation.currency, ownerUserId: ctx.user.id, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), approvalRequired: outcome.exceptionType === "short_payment" ? 1 : 0, correlationId, createdByUserId: ctx.user.id });
               }
-              await tx.insert(auditEvents).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "reconciliation.completed", entityType: "reconciliation_link", entityId, correlationId, metadata: outcome });
+              await tx.insert(auditEvents).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "reconciliation.completed", entityType: "reconciliation_link", entityId, correlationId, metadata: { ...outcome, allocation } });
             });
             return { entityId, correlationId };
           },

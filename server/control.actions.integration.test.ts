@@ -19,12 +19,17 @@ function authContext(): TrpcContext {
 function queuedDatabase(selections: unknown[][]) {
   const inserted: Recorded[] = [];
   const updates: Recorded[] = [];
+  const executableRows = (rows: unknown[]) => {
+    const query = Promise.resolve(rows) as Promise<unknown[]> & { limit: () => Promise<unknown[]> };
+    query.limit = async () => rows;
+    return query;
+  };
   const values = async (payload: Recorded) => {
     inserted.push(payload);
     return { affectedRows: 1 };
   };
   const database = {
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => selections.shift() ?? [] }) }) }),
+    select: () => ({ from: () => ({ where: () => executableRows(selections.shift() ?? []) }) }),
     insert: () => ({ values }),
     update: () => ({ set: (payload: Recorded) => ({ where: async () => { updates.push(payload); return { affectedRows: 1 }; } }) }),
     delete: () => ({ where: async () => ({ affectedRows: 1 }) }),
@@ -87,7 +92,7 @@ describe("material control action procedures", () => {
 
     expect(result.replayed).toBe(false);
     expect(inserted.some(row => row.action === "reconciliation.run" && typeof row.requestHash === "string")).toBe(true);
-    expect(inserted.some(row => row.matchType === "exact" && row.ruleVersion === "release-1.0")).toBe(true);
+    expect(inserted.some(row => row.matchType === "exact" && row.ruleVersion === "release-1.1")).toBe(true);
   });
 
   it("creates a linked receivable correction instead of altering the original obligation", async () => {

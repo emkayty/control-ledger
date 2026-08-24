@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { canPerform } from "./access";
 import { assertMinorAmount, isMinorAmount } from "./money";
-import { determineReconciliation } from "./reconciliation";
+import { calculateAvailableAllocation, determineReconciliation } from "./reconciliation";
 
 describe("exact money controls", () => {
   it("accepts integer minor units and rejects floating point input", () => {
@@ -15,6 +15,12 @@ describe("exact money controls", () => {
 });
 
 describe("deterministic reconciliation", () => {
+  it("allocates only the remaining exact balance for split payments and one payment across multiple obligations", () => {
+    expect(calculateAvailableAllocation({ obligationMinor: "500000", observedMinor: "200000", alreadyAllocatedToObligation: "0", alreadyAllocatedFromEvidence: "0" })).toEqual({ obligationRemainingMinor: "500000", evidenceRemainingMinor: "200000", allocatableMinor: "200000" });
+    expect(calculateAvailableAllocation({ obligationMinor: "500000", observedMinor: "300000", alreadyAllocatedToObligation: "200000", alreadyAllocatedFromEvidence: "0" })).toEqual({ obligationRemainingMinor: "300000", evidenceRemainingMinor: "300000", allocatableMinor: "300000" });
+    expect(calculateAvailableAllocation({ obligationMinor: "500000", observedMinor: "1000000", alreadyAllocatedToObligation: "0", alreadyAllocatedFromEvidence: "500000" })).toEqual({ obligationRemainingMinor: "500000", evidenceRemainingMinor: "500000", allocatableMinor: "500000" });
+  });
+
   it("classifies an exact on-time match as matched", () => {
     expect(determineReconciliation({ obligationMinor: "500000", observedMinor: "500000", hasExistingLink: false, delayed: false })).toMatchObject({
       matchType: "exact", status: "matched", allocatedMinor: "500000", unresolvedMinor: "0",
