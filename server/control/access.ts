@@ -13,6 +13,7 @@ export const permissions = {
   reconcile: ["owner", "controller", "manager"],
   resolve: ["owner", "controller", "manager"],
   approve: ["owner", "controller", "approver"],
+  manageMemberships: ["owner", "controller"],
 } as const;
 
 export function canPerform(role: ControlRole, action: keyof typeof permissions) {

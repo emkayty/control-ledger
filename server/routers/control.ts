@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditEvents,
@@ -16,6 +16,7 @@ import {
   organisations,
   receivableObligations,
   reconciliationLinks,
+  users,
 } from "../../drizzle/schema";
 import { requireScopedMembership, permissions } from "../control/access";
 import { assertEvidenceFileInput, assertEvidenceLinkScope } from "../control/fileSecurity";
@@ -188,6 +189,75 @@ export const controlRouter = router({
         });
         return { organisationId, branchId };
       }),
+  }),
+
+  memberships: router({
+    list: protectedProcedure.input(z.object({ organisationId: z.string().uuid() })).query(async ({ ctx, input }) => {
+      const manager = await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, allowed: permissions.manageMemberships });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const scopeCondition = manager.branchId ? or(eq(organisationMemberships.branchId, manager.branchId), isNull(organisationMemberships.branchId)) : undefined;
+      return db.select({
+        id: organisationMemberships.id,
+        userId: organisationMemberships.userId,
+        branchId: organisationMemberships.branchId,
+        role: organisationMemberships.role,
+        isActive: organisationMemberships.isActive,
+        createdAt: organisationMemberships.createdAt,
+        name: users.name,
+        email: users.email,
+      }).from(organisationMemberships).innerJoin(users, eq(users.id, organisationMemberships.userId)).where(and(eq(organisationMemberships.organisationId, input.organisationId), scopeCondition)).orderBy(desc(organisationMemberships.createdAt));
+    }),
+    grant: protectedProcedure.input(z.object({
+      organisationId: z.string().uuid(),
+      branchId: z.string().uuid().nullable(),
+      existingUserEmail: z.string().email(),
+      role: z.enum(["owner", "controller", "operator", "manager", "approver"]),
+      idempotencyKey: z.string().min(8).max(128),
+    })).mutation(async ({ ctx, input }) => {
+      const manager = await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, allowed: permissions.manageMemberships });
+      if (manager.role === "controller" && (["owner", "controller"].includes(input.role) || !input.branchId || input.branchId !== manager.branchId)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "A branch controller can only grant operator, manager, or approver access within their own branch." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      if (input.branchId) {
+        const branch = await db.select({ id: branches.id }).from(branches).where(and(eq(branches.id, input.branchId), eq(branches.organisationId, input.organisationId), eq(branches.isActive, 1))).limit(1);
+        if (!branch[0]) throw new TRPCError({ code: "NOT_FOUND", message: "The selected branch is not active in this organisation." });
+      }
+      const target = await db.select({ id: users.id }).from(users).where(eq(users.email, input.existingUserEmail)).limit(1);
+      if (!target[0]) throw new TRPCError({ code: "NOT_FOUND", message: "This person must sign in to Control Ledger before access can be granted." });
+      return getOrCreateIdempotent({
+        organisationId: input.organisationId, userId: ctx.user.id, action: "membership.grant", idempotencyKey: input.idempotencyKey, request: input,
+        execute: async () => {
+          const correlationId = correlation();
+          const existing = await db.select().from(organisationMemberships).where(and(eq(organisationMemberships.organisationId, input.organisationId), eq(organisationMemberships.userId, target[0].id), input.branchId ? eq(organisationMemberships.branchId, input.branchId) : isNull(organisationMemberships.branchId))).limit(1);
+          const entityId = existing[0]?.id ?? recordId();
+          if (existing[0]) await db.update(organisationMemberships).set({ role: input.role, isActive: 1 }).where(eq(organisationMemberships.id, existing[0].id));
+          else await db.insert(organisationMemberships).values({ id: entityId, organisationId: input.organisationId, userId: target[0].id, branchId: input.branchId, role: input.role });
+          await writeAudit({ organisationId: input.organisationId, branchId: input.branchId ?? undefined, actorUserId: ctx.user.id, action: existing[0] ? "membership.updated" : "membership.granted", entityType: "organisation_membership", entityId, correlationId, metadata: { targetUserId: target[0].id, role: input.role, branchId: input.branchId } });
+          return { entityId, correlationId };
+        },
+      });
+    }),
+    revoke: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), membershipId: z.string().uuid(), idempotencyKey: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+      const manager = await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, allowed: permissions.manageMemberships });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const target = await db.select().from(organisationMemberships).where(and(eq(organisationMemberships.id, input.membershipId), eq(organisationMemberships.organisationId, input.organisationId))).limit(1);
+      if (!target[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found." });
+      if (target[0].userId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot revoke your own active access." });
+      if (manager.role === "controller" && (target[0].branchId !== manager.branchId || ["owner", "controller"].includes(target[0].role))) throw new TRPCError({ code: "FORBIDDEN", message: "A branch controller can only revoke non-controller access in their own branch." });
+      return getOrCreateIdempotent({
+        organisationId: input.organisationId, userId: ctx.user.id, action: "membership.revoke", idempotencyKey: input.idempotencyKey, request: input,
+        execute: async () => {
+          const correlationId = correlation();
+          await db.update(organisationMemberships).set({ isActive: 0 }).where(eq(organisationMemberships.id, target[0].id));
+          await writeAudit({ organisationId: input.organisationId, branchId: target[0].branchId ?? undefined, actorUserId: ctx.user.id, action: "membership.revoked", entityType: "organisation_membership", entityId: target[0].id, correlationId, metadata: { targetUserId: target[0].userId, role: target[0].role, branchId: target[0].branchId } });
+          return { entityId: target[0].id, correlationId };
+        },
+      });
+    }),
   }),
 
   dashboard: protectedProcedure.input(controlScope).query(async ({ ctx, input }) => {

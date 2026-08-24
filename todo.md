@@ -21,6 +21,8 @@
 - [x] Add isolated protected-scope procedure tests that verify allowed roles and fail-closed unauthorised membership outcomes without inserting operational test data.
 - [ ] Conduct authenticated dashboard, receivables, evidence, reconciliation, and exceptions smoke tests using user-owned workspace data on desktop and mobile; then inspect runtime logs.
 - [ ] Review the user-created workspace records and report whether the implemented Release 1 controls operate as intended.
+- [x] Add owner/controller-governed membership management for existing users, including organisation-wide and branch-scoped role assignment, revocation, and access visibility.
+- [x] Hide the revoke action for the signed-in user to match the self-revocation protection enforced by the access API.
 - [x] Replace the horizontally clipped mobile receivables table with a compact card presentation while retaining the desktop table.
 - [x] Produce the Release 1 readiness summary.
 - [ ] Create the final project checkpoint and provide the project version to the user.
