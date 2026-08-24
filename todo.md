@@ -15,6 +15,7 @@
 - [x] Add explicit loading and recovery states to receivables, evidence, and exceptions views.
 - [x] Build a polished mobile-first dashboard showing scoped position, reconciliation coverage, priority exceptions, status language, and drill-down paths.
 - [x] Build responsive customer, receivable, evidence-intake, reconciliation, and exception-control views with loading, empty, error, and success states.
+- [x] Add a tenant- and branch-scoped audit trail view so users can inspect append-only material-action history and correlation identifiers.
 - [x] Create a premium responsive application shell with accessible navigation, mobile drawer behaviour, visible focus states, and role-aware page affordances.
 - [x] Add isolated material-action procedure tests covering idempotency recording, reconciliation mutation, approval control, and append-only correction creation without writing customer workspace records.
 - [x] Add a tRPC integration-style test for authenticated protected workspace access and scoped response shaping without writing artificial business records.
@@ -22,6 +23,11 @@
 - [ ] Conduct authenticated dashboard, receivables, evidence, reconciliation, and exceptions smoke tests using user-owned workspace data on desktop and mobile; then inspect runtime logs.
 - [ ] Review the user-created workspace records and report whether the implemented Release 1 controls operate as intended.
 - [x] Add owner/controller-governed membership management for existing users, including organisation-wide and branch-scoped role assignment, revocation, and access visibility.
+- [x] Add owner-governed branch creation and branch visibility so an organisation can operate multiple independently scoped branches.
+- [x] Make branch creation replay-safe by applying idempotency validation before duplicate-code conflict handling.
+- [x] Verify the branch-create idempotency adjustment with safe-replay and distinct-request duplicate-code tests.
+- [x] Add automated tests for owner-only branch creation, branch-code uniqueness, and organisation-wide versus branch-scoped visibility.
+- [ ] Perform an authorised end-to-end branch creation and workspace-selector validation without inventing operational financial records.
 - [x] Hide the revoke action for the signed-in user to match the self-revocation protection enforced by the access API.
 - [x] Replace the horizontally clipped mobile receivables table with a compact card presentation while retaining the desktop table.
 - [x] Produce the Release 1 readiness summary.

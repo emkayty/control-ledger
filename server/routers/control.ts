@@ -150,7 +150,12 @@ export const controlRouter = router({
       const branchRows = organisationIds.length
         ? await db.select().from(branches).where(inArray(branches.organisationId, organisationIds))
         : [];
-      return { memberships, branches: branchRows.filter(branch => branch.isActive === 1) };
+      const organisationWideIds = new Set(memberships.filter(membership => membership.branchId === null).map(membership => membership.organisationId));
+      const permittedBranchIds = new Set(memberships.map(membership => membership.branchId).filter((branchId): branchId is string => Boolean(branchId)));
+      return {
+        memberships,
+        branches: branchRows.filter(branch => branch.isActive === 1 && (organisationWideIds.has(branch.organisationId) || permittedBranchIds.has(branch.id))),
+      };
     }),
     bootstrap: protectedProcedure
       .input(z.object({ organisationName: z.string().min(2).max(160), branchName: z.string().min(2).max(160) }))
@@ -189,6 +194,49 @@ export const controlRouter = router({
         });
         return { organisationId, branchId };
       }),
+  }),
+
+  branches: router({
+    create: protectedProcedure.input(z.object({
+      organisationId: z.string().uuid(),
+      name: z.string().min(2).max(160),
+      code: z.string().min(2).max(16).regex(/^[A-Za-z0-9_-]+$/, "Use only letters, numbers, underscores, or hyphens."),
+      idempotencyKey: z.string().min(8).max(128),
+    })).mutation(async ({ ctx, input }) => {
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, allowed: ["owner"] });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const code = input.code.trim().toUpperCase();
+      return getOrCreateIdempotent({
+        organisationId: input.organisationId, userId: ctx.user.id, action: "branch.create", idempotencyKey: input.idempotencyKey, request: { ...input, code },
+        execute: async () => {
+          const duplicate = await db.select({ id: branches.id }).from(branches).where(and(eq(branches.organisationId, input.organisationId), eq(branches.code, code))).limit(1);
+          if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "This branch code already exists in the organisation." });
+          const entityId = recordId(); const correlationId = correlation();
+          await db.insert(branches).values({ id: entityId, organisationId: input.organisationId, name: input.name.trim(), code });
+          await writeAudit({ organisationId: input.organisationId, branchId: entityId, actorUserId: ctx.user.id, action: "branch.created", entityType: "branch", entityId, correlationId, metadata: { name: input.name.trim(), code } });
+          return { entityId, correlationId };
+        },
+      });
+    }),
+  }),
+
+  audit: router({
+    list: protectedProcedure.input(controlScope.extend({ limit: z.number().int().min(1).max(100).default(50) })).query(async ({ ctx, input }) => {
+      const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.read });
+      return db.select({
+        id: auditEvents.id,
+        action: auditEvents.action,
+        entityType: auditEvents.entityType,
+        entityId: auditEvents.entityId,
+        branchId: auditEvents.branchId,
+        correlationId: auditEvents.correlationId,
+        metadata: auditEvents.metadata,
+        occurredAt: auditEvents.occurredAt,
+        actorName: users.name,
+        actorEmail: users.email,
+      }).from(auditEvents).innerJoin(users, eq(users.id, auditEvents.actorUserId)).where(and(eq(auditEvents.organisationId, input.organisationId), or(eq(auditEvents.branchId, input.branchId), isNull(auditEvents.branchId)))).orderBy(desc(auditEvents.occurredAt)).limit(input.limit);
+    }),
   }),
 
   memberships: router({
