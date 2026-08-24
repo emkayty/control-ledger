@@ -5,6 +5,7 @@
 - [x] Verify the applied database schema against the Drizzle definitions by checking Release 1 control tables and key uniqueness indexes in the live database.
 - [x] Implement tenant- and branch-bound access helpers and protected APIs for role-aware control workflows.
 - [x] Implement append-only receivable, payment-observation, settlement-evidence, audit, and correction records using exact minor-unit money values and correlation IDs.
+- [x] Require positive exact money values for original receivable and evidence records while preserving signed append-only corrections.
 - [x] Implement linked, append-only receivable and evidence correction APIs that preserve the original record and record a correction reference, reason, actor, and correlation ID.
 - [x] Implement secure evidence-file upload metadata and controlled retrieval using managed object storage rather than database blobs.
 - [x] Validate linked evidence-event and exception ownership before storing evidence-file metadata, and test cross-tenant or cross-branch link rejection.

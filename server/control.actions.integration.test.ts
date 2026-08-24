@@ -110,6 +110,39 @@ describe("material control action procedures", () => {
     expect(inserted.some(row => row.correctsObligationId === obligationId && row.sourceType === "correction")).toBe(true);
   });
 
+  it("rejects a zero-value original receivable before it can enter the control ledger", async () => {
+    await expect(appRouter.createCaller(authContext()).control.obligations.create({
+      organisationId,
+      branchId,
+      customerId: "9b52d5e3-74c4-45a6-a2ec-207ab249ff0e",
+      reference: "INV-ZERO",
+      amountMinor: "0",
+      currency: "NGN",
+      idempotencyKey: "zero-obligation-1",
+    })).rejects.toThrow("greater than zero");
+    expect(getDbMock).not.toHaveBeenCalled();
+  });
+
+  it("quarantines a zero-value original evidence intake rather than creating evidence", async () => {
+    const { database, inserted } = queuedDatabase([membership, branch, []]);
+    getDbMock.mockResolvedValue(database);
+
+    const result = await appRouter.createCaller(authContext()).control.evidence.intake({
+      organisationId,
+      branchId,
+      kind: "payment_observation",
+      amountMinor: "0",
+      currency: "NGN",
+      sourceName: "Bank feed",
+      sourceReference: "BANK-ZERO-1",
+      idempotencyKey: "zero-evidence-1",
+    });
+
+    expect(result.status).toBe("quarantined");
+    expect(inserted.some(row => row.status === "quarantined" && row.quarantineReason === "Amount must be a positive exact minor-unit integer.")).toBe(true);
+    expect(inserted.some(row => row.action === "evidence.recorded")).toBe(false);
+  });
+
   it("applies approval only from an eligible, non-initiating actor", async () => {
     const { database, updates } = queuedDatabase([
       [{ id: "exception-1", organisationId, branchId, status: "pending_approval", createdByUserId: 9 }],

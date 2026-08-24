@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { canPerform } from "./access";
-import { assertMinorAmount, isMinorAmount } from "./money";
+import { assertMinorAmount, assertPositiveMinorAmount, isMinorAmount, isPositiveMinorAmount } from "./money";
 import { calculateAvailableAllocation, determineReconciliation } from "./reconciliation";
 
 describe("exact money controls", () => {
@@ -11,6 +11,11 @@ describe("exact money controls", () => {
     expect(() => assertMinorAmount("1,25000")).toThrow("exact integer minor-unit");
     expect(isMinorAmount("750000")).toBe(true);
     expect(isMinorAmount("7500.00")).toBe(false);
+    expect(isPositiveMinorAmount("750000")).toBe(true);
+    expect(isPositiveMinorAmount("0")).toBe(false);
+    expect(isPositiveMinorAmount("-50000")).toBe(false);
+    expect(() => assertPositiveMinorAmount("0")).toThrow("greater than zero");
+    expect(() => assertPositiveMinorAmount("-50000")).toThrow("greater than zero");
   });
 });
 

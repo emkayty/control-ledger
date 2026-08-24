@@ -20,7 +20,7 @@ import {
 } from "../../drizzle/schema";
 import { requireScopedMembership, permissions } from "../control/access";
 import { assertEvidenceFileInput, assertEvidenceLinkScope } from "../control/fileSecurity";
-import { assertMinorAmount, isMinorAmount } from "../control/money";
+import { assertMinorAmount, assertPositiveMinorAmount, isPositiveMinorAmount } from "../control/money";
 import { calculateAvailableAllocation, determineReconciliation } from "../control/reconciliation";
 import { getDb } from "../db";
 import { storageGet, storagePut } from "../storage";
@@ -370,7 +370,7 @@ export const controlRouter = router({
     create: protectedProcedure
       .input(controlScope.extend({ customerId: z.string().uuid(), reference: z.string().min(2).max(96), amountMinor: z.string(), currency: z.string().length(3).transform(value => value.toUpperCase()), dueAt: z.coerce.date().optional(), sourceReference: z.string().max(128).optional(), idempotencyKey: z.string().min(8).max(128) }))
       .mutation(async ({ ctx, input }) => {
-        assertMinorAmount(input.amountMinor);
+        assertPositiveMinorAmount(input.amountMinor);
         const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.createObligation });
         const customer = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.id, input.customerId), eq(customers.organisationId, input.organisationId), eq(customers.branchId, input.branchId))).limit(1);
         if (!customer[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Customer is not in the selected branch." });
@@ -423,11 +423,11 @@ export const controlRouter = router({
         const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.recordEvidence });
         const duplicate = await db.select({ id: integrationIntakeRecords.id }).from(integrationIntakeRecords).where(and(eq(integrationIntakeRecords.organisationId, input.organisationId), eq(integrationIntakeRecords.sourceName, input.sourceName), eq(integrationIntakeRecords.sourceReference, input.sourceReference))).limit(1);
         if (duplicate[0]) return { status: "duplicate" as const, intakeId: duplicate[0].id };
-        if (!isMinorAmount(input.amountMinor)) {
+        if (!isPositiveMinorAmount(input.amountMinor)) {
           const intakeId = recordId(); const correlationId = correlation();
           await db.transaction(async tx => {
-            await tx.insert(integrationIntakeRecords).values({ id: intakeId, organisationId: input.organisationId, branchId: input.branchId, sourceName: input.sourceName, sourceReference: input.sourceReference, payloadHash: sha256(JSON.stringify(input)), status: "quarantined", quarantineReason: "Amount must be an exact minor-unit integer.", sourceMetadata: input.sourceMetadata, correlationId });
-            await tx.insert(auditEvents).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.intake_quarantined", entityType: "integration_intake_record", entityId: intakeId, correlationId, metadata: { reason: "invalid_minor_amount", sourceName: input.sourceName, sourceReference: input.sourceReference } });
+            await tx.insert(integrationIntakeRecords).values({ id: intakeId, organisationId: input.organisationId, branchId: input.branchId, sourceName: input.sourceName, sourceReference: input.sourceReference, payloadHash: sha256(JSON.stringify(input)), status: "quarantined", quarantineReason: "Amount must be a positive exact minor-unit integer.", sourceMetadata: input.sourceMetadata, correlationId });
+            await tx.insert(auditEvents).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.intake_quarantined", entityType: "integration_intake_record", entityId: intakeId, correlationId, metadata: { reason: "invalid_original_amount", sourceName: input.sourceName, sourceReference: input.sourceReference } });
           });
           return { status: "quarantined" as const, intakeId };
         }

@@ -17,6 +17,21 @@ export function assertMinorAmount(value: string) {
   return value;
 }
 
+export function isPositiveMinorAmount(value: string) {
+  return isMinorAmount(value) && BigInt(value) > BigInt(0);
+}
+
+export function assertPositiveMinorAmount(value: string) {
+  assertMinorAmount(value);
+  if (BigInt(value) <= BigInt(0)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Amount must be greater than zero for an original operational record.",
+    });
+  }
+  return value;
+}
+
 export function compareMinor(left: string, right: string) {
   const a = BigInt(left);
   const b = BigInt(right);
