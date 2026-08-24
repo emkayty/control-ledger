@@ -49,6 +49,20 @@ function workspaceDatabaseFor(memberships: Array<{ organisationId: string; branc
   };
 }
 
+function auditDatabase() {
+  let calls = 0;
+  const organisationId = "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0";
+  const branchId = "f894a6a4-b488-48f1-9e45-dba4f4f9d9c3";
+  return {
+    select: () => {
+      calls += 1;
+      if (calls === 1) return { from: () => ({ where: () => ({ limit: async () => [{ id: "member", organisationId, userId: 1, branchId, role: "operator", isActive: 1 }] }) }) };
+      if (calls === 2) return { from: () => ({ where: () => ({ limit: async () => [{ id: branchId, organisationId, isActive: 1 }] }) }) };
+      return { from: () => ({ innerJoin: () => ({ where: () => ({ orderBy: () => ({ limit: async () => [{ id: "audit-1", action: "obligation.recorded", entityType: "receivable_obligation", entityId: "obligation-1", branchId, correlationId: "corr-1", metadata: { reference: "INV-100" }, occurredAt: new Date("2026-08-24T12:00:00.000Z"), actorName: "Scope Test", actorEmail: "scope@example.com" }] }) }) }) }) };
+    },
+  };
+}
+
 describe("control workspace protected procedure integration", () => {
   beforeEach(() => getDbMock.mockReset());
 
@@ -92,5 +106,22 @@ describe("control workspace protected procedure integration", () => {
     getDbMock.mockResolvedValueOnce(workspaceDatabaseFor([{ organisationId, branchId: null, role: "owner", organisationName: "Aster Distribution" }], [mainBranch, lagosBranch]));
     const organisationWide = await appRouter.createCaller(authContext(user)).control.workspace.list();
     expect(organisationWide.branches.map(branch => branch.id)).toEqual([mainBranch.id, lagosBranch.id]);
+  });
+
+  it("returns scoped audit history with the immutable action and correlation fields", async () => {
+    getDbMock.mockResolvedValue(auditDatabase());
+    const result = await appRouter.createCaller(authContext({ id: 1, openId: "scope-test-user", email: "scope@example.com", name: "Scope Test", loginMethod: "manus", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() })).control.audit.list({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f4f9d9c3", limit: 50 });
+    expect(result).toEqual([expect.objectContaining({ action: "obligation.recorded", correlationId: "corr-1", actorName: "Scope Test" })]);
+  });
+
+  it("rejects unauthenticated audit-history access before database retrieval", async () => {
+    const caller = appRouter.createCaller(authContext(null));
+    await expect(caller.control.audit.list({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f4f9d9c3", limit: 50 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("fails closed when an authenticated user lacks an active membership for the audit scope", async () => {
+    getDbMock.mockResolvedValue({ select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) });
+    const caller = appRouter.createCaller(authContext({ id: 7, openId: "unauthorised-user", email: "unauthorised@example.com", name: "Unauthorised", loginMethod: "manus", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }));
+    await expect(caller.control.audit.list({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f4f9d9c3", limit: 50 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

@@ -15,7 +15,10 @@
 - [x] Add explicit loading and recovery states to receivables, evidence, and exceptions views.
 - [x] Build a polished mobile-first dashboard showing scoped position, reconciliation coverage, priority exceptions, status language, and drill-down paths.
 - [x] Build responsive customer, receivable, evidence-intake, reconciliation, and exception-control views with loading, empty, error, and success states.
+- [x] Simplify the day-to-day operating flow with a guided control checklist and clearer next actions while preserving all underlying validation and audit controls.
 - [x] Add a tenant- and branch-scoped audit trail view so users can inspect append-only material-action history and correlation identifiers.
+- [x] Add and verify protected-procedure coverage for branch-scoped audit history retrieval.
+- [x] Add and verify fail-closed negative-path tests for unauthenticated and unauthorised audit-history access.
 - [x] Create a premium responsive application shell with accessible navigation, mobile drawer behaviour, visible focus states, and role-aware page affordances.
 - [x] Add isolated material-action procedure tests covering idempotency recording, reconciliation mutation, approval control, and append-only correction creation without writing customer workspace records.
 - [x] Add a tRPC integration-style test for authenticated protected workspace access and scoped response shaping without writing artificial business records.
