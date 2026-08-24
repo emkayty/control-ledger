@@ -16,9 +16,11 @@
 - [x] Build a polished mobile-first dashboard showing scoped position, reconciliation coverage, priority exceptions, status language, and drill-down paths.
 - [x] Build responsive customer, receivable, evidence-intake, reconciliation, and exception-control views with loading, empty, error, and success states.
 - [x] Create a premium responsive application shell with accessible navigation, mobile drawer behaviour, visible focus states, and role-aware page affordances.
-- [ ] Add integration tests for idempotent material actions, reconciliation mutations, approval control, and append-only correction APIs.
+- [x] Add isolated material-action procedure tests covering idempotency recording, reconciliation mutation, approval control, and append-only correction creation without writing customer workspace records.
 - [x] Add a tRPC integration-style test for authenticated protected workspace access and scoped response shaping without writing artificial business records.
 - [x] Add isolated protected-scope procedure tests that verify allowed roles and fail-closed unauthorised membership outcomes without inserting operational test data.
 - [ ] Conduct authenticated dashboard, receivables, evidence, reconciliation, and exceptions smoke tests using user-owned workspace data on desktop and mobile; then inspect runtime logs.
+- [ ] Review the user-created workspace records and report whether the implemented Release 1 controls operate as intended.
+- [x] Replace the horizontally clipped mobile receivables table with a compact card presentation while retaining the desktop table.
 - [x] Produce the Release 1 readiness summary.
 - [ ] Create the final project checkpoint and provide the project version to the user.

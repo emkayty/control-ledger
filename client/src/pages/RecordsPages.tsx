@@ -256,7 +256,16 @@ export function ReceivablesPage() {
         <EmptyState icon={ReceiptText} title="No receivables in this branch" copy="First create a customer, then record the commercial obligation that should be collected." />
       ) : (
         <section className="soft-card overflow-hidden rounded-3xl border bg-card">
-          <div className="overflow-x-auto">
+          <div className="divide-y sm:hidden">
+            {obligations.data?.map(item => (
+              <article key={item.id} className="p-4">
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-extrabold">{item.reference}</p><p className="mt-1 text-xs text-muted-foreground">{item.sourceType}{item.correctsObligationId ? " · correction" : ""}</p></div><StatusPill status={item.status} /></div>
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t pt-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Amount</p><p className="money mt-1 text-sm font-medium">{formatMoney(String(item.amountMinor), item.currency)}</p></div><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Due date</p><p className="mt-1 text-sm font-semibold">{item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set"}</p></div></div>
+                <p className="mt-3 font-mono text-[10px] text-muted-foreground">{item.correlationId.slice(0, 12)}…</p>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[680px] text-left">
               <thead className="border-b bg-slate-50/70 text-[10px] font-extrabold uppercase tracking-[0.13em] text-muted-foreground">
                 <tr><th className="px-5 py-3">Reference</th><th className="px-5 py-3">Amount</th><th className="px-5 py-3">Due date</th><th className="px-5 py-3">State</th><th className="px-5 py-3">Provenance</th></tr>
