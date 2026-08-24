@@ -38,4 +38,5 @@
 - [x] Hide the revoke action for the signed-in user to match the self-revocation protection enforced by the access API.
 - [x] Replace the horizontally clipped mobile receivables table with a compact card presentation while retaining the desktop table.
 - [x] Produce the Release 1 readiness summary.
+- [x] Add and verify a concise role-aware acceptance checklist that guides controlled validation of cash, bank-transfer, and delivery-proof workflows.
 - [ ] Create the final project checkpoint and provide the project version to the user.
