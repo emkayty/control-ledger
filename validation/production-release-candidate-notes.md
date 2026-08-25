@@ -33,3 +33,5 @@ The production evidence page was then fully reloaded under the owner session. It
 A fresh production `control.evidence.getFile` response during the initial propagation window still contained the prior raw storage metadata and raw path. Therefore, the scoped-delivery security remediation is **not yet accepted** in production and must be rechecked once the new deployment is definitively active.
 
 The page was also reloaded with a cache-busting query parameter and continued to display the unchanged evidence and proposal UI. The backend delivery shape still requires direct verification.
+
+After the API-route correction checkpoint, the production evidence page again loaded cleanly in the signed-in Main branch workspace with the original evidence and proposal unchanged. A fresh backend-response check follows.

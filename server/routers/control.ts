@@ -8,7 +8,6 @@ import {
   controlExceptions,
   customers,
   evidenceAssociationCorrections,
-  evidenceFileAccessGrants,
   evidenceEvents,
   evidenceFiles,
   exceptionApprovalDecisions,
@@ -30,7 +29,6 @@ import { calculateAvailableAllocation, determineReconciliation } from "../contro
 import { parseReceiptProposalResponse } from "../control/receiptExtraction";
 import { nextExceptionStatus } from "../control/varianceApproval";
 import { summariseVariancePortfolio } from "../control/variancePortfolio";
-import { createFileAccessGrant } from "../control/fileAccess";
 import { getDb } from "../db";
 import { storageGetSignedUrl, storagePut } from "../storage";
 import { invokeLLM, listLLMModels } from "../_core/llm";
@@ -615,14 +613,12 @@ export const controlRouter = router({
       const file = await db.select().from(evidenceFiles).where(and(eq(evidenceFiles.id, input.fileId), eq(evidenceFiles.organisationId, input.organisationId))).limit(1);
       if (!file[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Evidence file not found." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: file[0].branchId, allowed: permissions.read });
-      const grant = createFileAccessGrant();
-      await db.insert(evidenceFileAccessGrants).values({ id: recordId(), organisationId: file[0].organisationId, branchId: file[0].branchId, evidenceFileId: file[0].id, userId: ctx.user.id, tokenHash: grant.tokenHash, expiresAt: grant.expiresAt });
       return {
         id: file[0].id,
         originalName: file[0].originalName,
         contentType: file[0].contentType,
         sizeBytes: file[0].sizeBytes,
-        url: `/api/control-files/grant/${grant.token}`,
+        url: await storageGetSignedUrl(file[0].storageKey),
       };
     }),
   }),
