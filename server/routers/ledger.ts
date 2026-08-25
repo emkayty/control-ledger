@@ -3,6 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
+  accountingPeriodDecisions,
+  accountingPeriods,
   auditEvents,
   branches,
   economicEvents,
@@ -57,6 +59,14 @@ export function journalPreparedAtRange(input: { fromDate?: string; toDate?: stri
   };
 }
 
+const periodInput = scopeInput.extend({ periodName: z.string().min(2).max(96), startsOn: dateOnly, endsOn: dateOnly }).superRefine((input, ctx) => {
+  if (input.startsOn > input.endsOn) ctx.addIssue({ code: "custom", message: "The period end date must be on or after the start date.", path: ["endsOn"] });
+});
+
+export function accountingPeriodRange(input: { startsOn: string; endsOn: string }) {
+  return { startsAt: new Date(`${input.startsOn}T00:00:00.000Z`), endsAt: new Date(`${input.endsOn}T23:59:59.999Z`) };
+}
+
 async function scopedDb(input: { organisationId: string; branchId: string; userId: number; allowed: readonly any[] }) {
   await requireScopedMembership(input);
   const db = await getDb();
@@ -104,6 +114,19 @@ async function assertActiveAccounts(db: NonNullable<Awaited<ReturnType<typeof ge
   return byId;
 }
 
+async function resolveOpenPeriod(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, input: { organisationId: string; branchId: string; effectiveAt: Date }) {
+  const periods = await db.select().from(accountingPeriods).where(and(eq(accountingPeriods.organisationId, input.organisationId), eq(accountingPeriods.branchId, input.branchId)));
+  if (!periods.length) return null;
+  const period = periods.find(item => item.status === "open" && item.startsAt.getTime() <= input.effectiveAt.getTime() && item.endsAt.getTime() >= input.effectiveAt.getTime());
+  if (!period) throw new TRPCError({ code: "BAD_REQUEST", message: "This branch has configured accounting periods, but the journal date is not in an open period." });
+  return period.id;
+}
+
+async function readyJournalCountForPeriod(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, input: { organisationId: string; branchId: string; periodId: string; startsAt: Date; endsAt: Date }) {
+  const readyJournals = await db.select().from(ledgerJournals).where(and(eq(ledgerJournals.organisationId, input.organisationId), eq(ledgerJournals.branchId, input.branchId), eq(ledgerJournals.status, "ready")));
+  return readyJournals.filter(journal => journal.periodId === input.periodId || (journal.preparedAt.getTime() >= input.startsAt.getTime() && journal.preparedAt.getTime() <= input.endsAt.getTime())).length;
+}
+
 function journalWithLines(journals: any[], lines: any[], decisions: any[]) {
   return journals.map(journal => ({
     ...journal,
@@ -113,6 +136,66 @@ function journalWithLines(journals: any[], lines: any[], decisions: any[]) {
 }
 
 export const ledgerRouter = router({
+  periods: router({
+    list: protectedProcedure.input(scopeInput).query(async ({ ctx, input }) => {
+      const db = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.read });
+      const [periods, decisions] = await Promise.all([
+        db.select().from(accountingPeriods).where(and(eq(accountingPeriods.organisationId, input.organisationId), eq(accountingPeriods.branchId, input.branchId))).orderBy(desc(accountingPeriods.startsAt)),
+        db.select().from(accountingPeriodDecisions).where(and(eq(accountingPeriodDecisions.organisationId, input.organisationId), eq(accountingPeriodDecisions.branchId, input.branchId))).orderBy(desc(accountingPeriodDecisions.createdAt)),
+      ]);
+      return periods.map(period => ({ ...period, decisions: decisions.filter(decision => decision.periodId === period.id) }));
+    }),
+    create: protectedProcedure.input(periodInput.merge(idempotencyInput).extend({ rationale: z.string().min(4).max(4000) })).mutation(async ({ ctx, input }) => {
+      const db = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.manageAccountingPeriods });
+      const range = accountingPeriodRange(input);
+      const existing = await db.select().from(accountingPeriods).where(and(eq(accountingPeriods.organisationId, input.organisationId), eq(accountingPeriods.branchId, input.branchId)));
+      if (existing.some(period => range.startsAt.getTime() <= period.endsAt.getTime() && range.endsAt.getTime() >= period.startsAt.getTime())) throw new TRPCError({ code: "CONFLICT", message: "Accounting periods may not overlap in the same branch." });
+      return idempotent({ organisationId: input.organisationId, userId: ctx.user.id, action: "release4.accounting_period.create", idempotencyKey: input.idempotencyKey, request: input, execute: async () => {
+        const entityId = recordId(); const correlationId = correlation(); const periodName = input.periodName.trim();
+        await db.transaction(async transaction => {
+          await transaction.insert(accountingPeriods).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, periodName, ...range, status: "open", correlationId, createdByUserId: ctx.user.id });
+          await transaction.insert(accountingPeriodDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, periodId: entityId, decision: "created", rationale: input.rationale.trim(), correlationId, createdByUserId: ctx.user.id });
+          await writeAudit(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "release4.accounting_period_created", entityType: "accounting_period", entityId, correlationId, metadata: { periodName, startsOn: input.startsOn, endsOn: input.endsOn } });
+        });
+        return { entityId, correlationId };
+      }});
+    }),
+    requestClose: protectedProcedure.input(scopeInput.extend({ periodId: z.string().uuid(), rationale: z.string().min(4).max(4000) }).merge(idempotencyInput)).mutation(async ({ ctx, input }) => {
+      const db = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.requestPeriodClose });
+      const [period] = await db.select().from(accountingPeriods).where(and(eq(accountingPeriods.id, input.periodId), eq(accountingPeriods.organisationId, input.organisationId), eq(accountingPeriods.branchId, input.branchId))).limit(1);
+      if (!period || period.status !== "open") throw new TRPCError({ code: "BAD_REQUEST", message: "Only an open accounting period can be submitted for independent close." });
+      const readyCount = await readyJournalCountForPeriod(db, { organisationId: input.organisationId, branchId: input.branchId, periodId: period.id, startsAt: period.startsAt, endsAt: period.endsAt });
+      if (readyCount) throw new TRPCError({ code: "BAD_REQUEST", message: `Post, reverse, or otherwise resolve the ${readyCount} ready journal${readyCount === 1 ? "" : "s"} in this period before requesting close.` });
+      return idempotent({ organisationId: input.organisationId, userId: ctx.user.id, action: "release4.accounting_period.close_request", idempotencyKey: input.idempotencyKey, request: input, execute: async () => {
+        const correlationId = correlation();
+        await db.transaction(async transaction => {
+          const result = await transaction.update(accountingPeriods).set({ status: "close_requested", closeRequestedByUserId: ctx.user.id, closeRequestedAt: new Date() }).where(and(eq(accountingPeriods.id, period.id), eq(accountingPeriods.status, "open")));
+          if ((result as unknown as { affectedRows?: number }).affectedRows !== 1) throw new TRPCError({ code: "CONFLICT", message: "This accounting period was updated by another authorised user." });
+          await transaction.insert(accountingPeriodDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, periodId: period.id, decision: "close_requested", rationale: input.rationale.trim(), correlationId, createdByUserId: ctx.user.id });
+          await writeAudit(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "release4.accounting_period_close_requested", entityType: "accounting_period", entityId: period.id, correlationId, metadata: { readyJournalCount: readyCount } });
+        });
+        return { entityId: period.id, correlationId };
+      }});
+    }),
+    decideClose: protectedProcedure.input(scopeInput.extend({ periodId: z.string().uuid(), decision: z.enum(["approve", "reject"]), rationale: z.string().min(4).max(4000) }).merge(idempotencyInput)).mutation(async ({ ctx, input }) => {
+      const db = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.decidePeriodClose });
+      const [period] = await db.select().from(accountingPeriods).where(and(eq(accountingPeriods.id, input.periodId), eq(accountingPeriods.organisationId, input.organisationId), eq(accountingPeriods.branchId, input.branchId))).limit(1);
+      if (!period || period.status !== "close_requested" || !period.closeRequestedByUserId) throw new TRPCError({ code: "BAD_REQUEST", message: "Only a pending accounting-period close request can be decided." });
+      if (period.closeRequestedByUserId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "The person who requested period close cannot decide it." });
+      const readyCount = input.decision === "approve" ? await readyJournalCountForPeriod(db, { organisationId: input.organisationId, branchId: input.branchId, periodId: period.id, startsAt: period.startsAt, endsAt: period.endsAt }) : 0;
+      if (readyCount) throw new TRPCError({ code: "BAD_REQUEST", message: `A ready journal appeared in this period. Close it only after the ${readyCount} ready journal${readyCount === 1 ? "" : "s"} is resolved.` });
+      return idempotent({ organisationId: input.organisationId, userId: ctx.user.id, action: `release4.accounting_period.close_${input.decision}`, idempotencyKey: input.idempotencyKey, request: input, execute: async () => {
+        const correlationId = correlation(); const approve = input.decision === "approve";
+        await db.transaction(async transaction => {
+          const result = await transaction.update(accountingPeriods).set(approve ? { status: "closed", closedByUserId: ctx.user.id, closedAt: new Date() } : { status: "open", closeRequestedByUserId: null, closeRequestedAt: null }).where(and(eq(accountingPeriods.id, period.id), eq(accountingPeriods.status, "close_requested")));
+          if ((result as unknown as { affectedRows?: number }).affectedRows !== 1) throw new TRPCError({ code: "CONFLICT", message: "This accounting period was already decided by another authorised reviewer." });
+          await transaction.insert(accountingPeriodDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, periodId: period.id, decision: approve ? "close_approved" : "close_rejected", rationale: input.rationale.trim(), correlationId, createdByUserId: ctx.user.id });
+          await writeAudit(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: approve ? "release4.accounting_period_closed" : "release4.accounting_period_close_rejected", entityType: "accounting_period", entityId: period.id, correlationId, metadata: { readyJournalCount: readyCount } });
+        });
+        return { entityId: period.id, correlationId };
+      }});
+    }),
+  }),
   accounts: router({
     list: protectedProcedure.input(scopeInput).query(async ({ ctx, input }) => {
       const db = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.read });
@@ -166,6 +249,7 @@ export const ledgerRouter = router({
       const db = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.prepareLedgerJournal });
       const [invoice] = await db.select().from(invoices).where(and(eq(invoices.id, input.invoiceId), eq(invoices.organisationId, input.organisationId), eq(invoices.branchId, input.branchId), eq(invoices.status, "issued"))).limit(1);
       if (!invoice || BigInt(String(invoice.amountMinor)) <= ZERO) throw new TRPCError({ code: "NOT_FOUND", message: "An issued positive-value invoice in the selected branch is required." });
+      const periodId = await resolveOpenPeriod(db, { organisationId: input.organisationId, branchId: input.branchId, effectiveAt: invoice.issuedAt });
       await assertActiveAccounts(db, { organisationId: input.organisationId, accountIds: [input.debitAccountId, input.creditAccountId] });
       const [existing] = await db.select({ id: economicEvents.id }).from(economicEvents).where(and(eq(economicEvents.organisationId, input.organisationId), eq(economicEvents.eventType, "invoice_receivable_recognition"), eq(economicEvents.sourceType, "invoice"), eq(economicEvents.sourceId, invoice.id))).limit(1);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "This invoice already has a Release 3 ledger event. Use the existing journal or prepare an explicit reversal." });
@@ -173,7 +257,7 @@ export const ledgerRouter = router({
         const entityId = recordId(); const eventId = recordId(); const correlationId = correlation(); const amountMinor = String(invoice.amountMinor);
         await db.transaction(async transaction => {
           await transaction.insert(economicEvents).values({ id: eventId, organisationId: input.organisationId, branchId: input.branchId, eventType: "invoice_receivable_recognition", status: "ready_to_post", sourceType: "invoice", sourceId: invoice.id, sourceReference: invoice.invoiceNumber, payload: { invoiceId: invoice.id, obligationId: invoice.obligationId, customerId: invoice.customerId, amountMinor, currency: invoice.currency }, occurredAt: invoice.issuedAt, actorUserId: ctx.user.id, correlationId });
-          await transaction.insert(ledgerJournals).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, economicEventId: eventId, sourceType: "invoice", sourceId: invoice.id, sourceReference: invoice.invoiceNumber, status: "ready", currency: invoice.currency, memo: input.memo.trim(), preparedByUserId: ctx.user.id, correlationId });
+          await transaction.insert(ledgerJournals).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, economicEventId: eventId, periodId, sourceType: "invoice", sourceId: invoice.id, sourceReference: invoice.invoiceNumber, status: "ready", currency: invoice.currency, memo: input.memo.trim(), preparedByUserId: ctx.user.id, correlationId });
           await transaction.insert(ledgerJournalLines).values([
             { id: recordId(), journalId: entityId, organisationId: input.organisationId, branchId: input.branchId, accountId: input.debitAccountId, debitMinor: amountMinor, creditMinor: "0", currency: invoice.currency, memo: input.memo.trim() },
             { id: recordId(), journalId: entityId, organisationId: input.organisationId, branchId: input.branchId, accountId: input.creditAccountId, debitMinor: "0", creditMinor: amountMinor, currency: invoice.currency, memo: input.memo.trim() },
@@ -215,11 +299,12 @@ export const ledgerRouter = router({
       if (!original) throw new TRPCError({ code: "NOT_FOUND", message: "Only a posted journal in the selected branch can be reversed." });
       const originalLines = await db.select().from(ledgerJournalLines).where(eq(ledgerJournalLines.journalId, original.id));
       assertBalanced(originalLines.map(line => ({ debitMinor: String(line.debitMinor), creditMinor: String(line.creditMinor) })));
+      const periodId = await resolveOpenPeriod(db, { organisationId: input.organisationId, branchId: input.branchId, effectiveAt: new Date() });
       return idempotent({ organisationId: input.organisationId, userId: ctx.user.id, action: "release3.ledger.journal.reverse.prepare", idempotencyKey: input.idempotencyKey, request: input, execute: async () => {
         const entityId = recordId(); const eventId = recordId(); const correlationId = correlation();
         await db.transaction(async transaction => {
           await transaction.insert(economicEvents).values({ id: eventId, organisationId: input.organisationId, branchId: input.branchId, eventType: "ledger_journal_reversal", status: "ready_to_post", sourceType: "ledger_journal", sourceId: original.id, sourceReference: original.sourceReference, causalEventId: original.economicEventId, payload: { reversalOfJournalId: original.id, sourceType: original.sourceType, sourceId: original.sourceId }, occurredAt: new Date(), actorUserId: ctx.user.id, correlationId });
-          await transaction.insert(ledgerJournals).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, economicEventId: eventId, sourceType: "ledger_journal_reversal", sourceId: original.id, sourceReference: original.sourceReference, status: "ready", currency: original.currency, memo: input.memo.trim(), reversalOfJournalId: original.id, preparedByUserId: ctx.user.id, correlationId });
+          await transaction.insert(ledgerJournals).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, economicEventId: eventId, periodId, sourceType: "ledger_journal_reversal", sourceId: original.id, sourceReference: original.sourceReference, status: "ready", currency: original.currency, memo: input.memo.trim(), reversalOfJournalId: original.id, preparedByUserId: ctx.user.id, correlationId });
           await transaction.insert(ledgerJournalLines).values(originalLines.map(line => ({ id: recordId(), journalId: entityId, organisationId: input.organisationId, branchId: input.branchId, accountId: line.accountId, debitMinor: String(line.creditMinor), creditMinor: String(line.debitMinor), currency: original.currency, memo: input.memo.trim() })));
           await transaction.insert(ledgerJournalDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: input.branchId, journalId: entityId, decision: "reversed", rationale: input.rationale.trim(), correlationId, createdByUserId: ctx.user.id });
           await writeAudit(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "release3.ledger_reversal_prepared", entityType: "ledger_journal", entityId, correlationId, metadata: { reversalOfJournalId: original.id, eventId } });

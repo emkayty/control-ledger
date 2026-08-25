@@ -23,6 +23,9 @@ export const permissions = {
   manageLedgerAccounts: ["owner", "controller"],
   prepareLedgerJournal: ["owner", "controller", "manager"],
   postLedgerJournal: ["owner", "controller", "approver"],
+  manageAccountingPeriods: ["owner", "controller"],
+  requestPeriodClose: ["owner", "controller", "manager"],
+  decidePeriodClose: ["owner", "controller", "approver"],
 } as const;
 
 export function canPerform(role: ControlRole, action: keyof typeof permissions) {

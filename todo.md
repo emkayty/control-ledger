@@ -48,7 +48,7 @@
 - [x] Replace the horizontally clipped mobile receivables table with a compact card presentation while retaining the desktop table.
 - [x] Produce the Release 1 readiness summary.
 - [x] Add and verify a concise role-aware acceptance checklist that guides controlled validation of cash, bank-transfer, and delivery-proof workflows.
-- [ ] Create the final project checkpoint and provide the project version to the user.
+- [x] Create the final project checkpoint and provide the project version to the user.
 - [x] Add an append-only variance approval workflow with investigation, submit-for-approval, approve/reject, and audited resolution decisions.
 - [x] Add owner/controller cross-branch dashboard visibility for open variance count and value while preserving branch-scoped operational detail.
 - [x] Add controlled receipt image previews that use authorised managed-file retrieval rather than public file access.
@@ -69,7 +69,7 @@
 - [x] Expand the in-product receipt-extraction policy with specific processing scope, proposal/audit retention boundary, and operator-facing authorised-use guidance.
 - [x] Add targeted router and UI coverage for receipt-extraction policy enable, disable, owner restriction, and fail-closed extraction behavior.
 - [ ] Complete real-device signed-in production acceptance checks for the enhanced dashboard, evidence, exception, and audit flows without submitting a resolution or changing evidence.
-- [ ] Replace the unauthenticated managed-storage redirect with an authenticated, tenant- and branch-scoped receipt-delivery route so possession or discovery of a storage key cannot bypass file access controls.
+- [x] Implement application-level controlled receipt preview access: protected tRPC authorises the tenant and branch before issuing a short-lived provider-signed URL, while raw `/manus-storage/*` application paths fail closed. The distinct legacy provider-object exposure remains tracked separately.
 - [x] Change the active receipt-preview flow so authenticated `getFile` authorises tenant and branch scope and returns only a short-lived provider-signed URL rather than raw file metadata.
 - [ ] Address legacy raw managed-storage URLs already exposed by the hosting-layer storage endpoint; newly issued controlled previews are authorised by protected tRPC before returning a short-lived provider-signed URL without raw storage metadata, but old object URLs require platform-level revocation or object rotation.
 - [x] Compare the supplied revised business thesis and target technical architecture against the current Control Ledger implementation, identifying alignment, gaps, and phased decisions.
@@ -101,3 +101,10 @@
 - [x] Add validated inclusive date-range filtering to Ledger journal views and CSV/PDF exports, using UTC persistence timestamps and clear empty-range handling.
 - [x] Consolidate Release 1–3 as one aligned control baseline across navigation, role-aware workflows, documentation, and verification records without claiming unresolved external gates are complete.
 - [x] Reconcile and document which remaining tasks require external provider action, hosting remediation, or genuine authorised real-device acceptance rather than further code changes.
+- [x] Audit and close the Release 1–3 code-completion register, separating completed application safeguards from external provider and authorised-acceptance evidence gates.
+- [x] Define the Release 4 production-operationalisation scope, accounting-policy boundaries, and acceptance criteria without creating artificial balances or decisions.
+- [x] Implement controlled Release 4 operational foundations, protected workflows, and role-aware governance using append-only and audited writes.
+- [x] Validate Release 4 with automated coverage, responsive verification, and an explicit record of remaining external gates.
+- [x] Add scoped accounting-period definitions, overlap protection, and open-period linkage for new Release 3 journal consequences without backfilling existing journals.
+- [x] Add independent period-close request, decision, and audit controls that block closure with ready journals and prevent self-closure.
+- [x] Add a mobile-first Ledger period-governance workspace with plain-language state, next actions, and no seeded financial data.

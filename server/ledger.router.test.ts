@@ -5,7 +5,7 @@ const { getDbMock } = vi.hoisted(() => ({ getDbMock: vi.fn() }));
 vi.mock("./db", () => ({ getDb: getDbMock }));
 
 import { appRouter } from "./routers";
-import { journalPreparedAtRange, ledgerMath } from "./routers/ledger";
+import { accountingPeriodRange, journalPreparedAtRange, ledgerMath } from "./routers/ledger";
 
 type Recorded = Record<string, unknown>;
 
@@ -53,6 +53,12 @@ describe("Release 3 ledger controls", () => {
     expect(range.to?.toISOString()).toBe("2026-08-25T23:59:59.999Z");
   });
 
+  it("converts an accounting period into inclusive UTC boundaries", () => {
+    const range = accountingPeriodRange({ startsOn: "2026-08-01", endsOn: "2026-08-31" });
+    expect(range.startsAt.toISOString()).toBe("2026-08-01T00:00:00.000Z");
+    expect(range.endsAt.toISOString()).toBe("2026-08-31T23:59:59.999Z");
+  });
+
   it("rejects an inverted journal date range before database access", async () => {
     await expect(appRouter.createCaller(authContext()).ledger.journals.list({ organisationId, branchId, fromDate: "2026-08-26", toDate: "2026-08-25" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(getDbMock).not.toHaveBeenCalled();
@@ -67,12 +73,75 @@ describe("Release 3 ledger controls", () => {
     expect(inserted).toHaveLength(0);
   });
 
+  it("denies an operator accounting-period configuration", async () => {
+    const membership = [{ id: "operator-member", organisationId, userId: 1, branchId, role: "operator", isActive: 1 }];
+    const { database, inserted } = queuedDatabase([membership]);
+    getDbMock.mockResolvedValue(database);
+    await expect(appRouter.createCaller(authContext()).ledger.periods.create({ organisationId, branchId, periodName: "August 2026", startsOn: "2026-08-01", endsOn: "2026-08-31", rationale: "Controlled monthly accounting window.", idempotencyKey: "release4-period-operator" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(inserted).toHaveLength(0);
+  });
+
+  it("prevents the period-close requester from deciding their own request", async () => {
+    const membership = [{ id: "controller-member", organisationId, userId: 1, branchId, role: "controller", isActive: 1 }];
+    const branch = [{ id: branchId, organisationId, isActive: 1 }];
+    const period = [{ id: journalId, organisationId, branchId, status: "close_requested", closeRequestedByUserId: 1, startsAt: new Date("2026-08-01T00:00:00.000Z"), endsAt: new Date("2026-08-31T23:59:59.999Z") }];
+    const { database, updates } = queuedDatabase([membership, branch, period]);
+    getDbMock.mockResolvedValue(database);
+    await expect(appRouter.createCaller(authContext()).ledger.periods.decideClose({ organisationId, branchId, periodId: journalId, decision: "approve", rationale: "Independent close review is required.", idempotencyKey: "release4-self-close" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("rejects an overlapping accounting period before any period decision is written", async () => {
+    const membership = [{ id: "controller-member", organisationId, userId: 1, branchId, role: "controller", isActive: 1 }];
+    const branch = [{ id: branchId, organisationId, isActive: 1 }];
+    const existingPeriod = [{ id: journalId, organisationId, branchId, startsAt: new Date("2026-08-01T00:00:00.000Z"), endsAt: new Date("2026-08-31T23:59:59.999Z") }];
+    const { database, inserted } = queuedDatabase([membership, branch, existingPeriod]);
+    getDbMock.mockResolvedValue(database);
+    await expect(appRouter.createCaller(authContext()).ledger.periods.create({ organisationId, branchId, periodName: "August overlap", startsOn: "2026-08-15", endsOn: "2026-09-15", rationale: "This intentionally overlaps for safety testing.", idempotencyKey: "release4-period-overlap" })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(inserted).toHaveLength(0);
+  });
+
+  it("blocks a period-close request while a ready journal remains in its window", async () => {
+    const membership = [{ id: "manager-member", organisationId, userId: 1, branchId, role: "manager", isActive: 1 }];
+    const branch = [{ id: branchId, organisationId, isActive: 1 }];
+    const period = [{ id: journalId, organisationId, branchId, status: "open", startsAt: new Date("2026-08-01T00:00:00.000Z"), endsAt: new Date("2026-08-31T23:59:59.999Z") }];
+    const readyJournal = [{ id: invoiceId, organisationId, branchId, periodId: journalId, status: "ready", preparedAt: new Date("2026-08-20T10:00:00.000Z") }];
+    const { database, updates } = queuedDatabase([membership, branch, period, readyJournal]);
+    getDbMock.mockResolvedValue(database);
+    await expect(appRouter.createCaller(authContext()).ledger.periods.requestClose({ organisationId, branchId, periodId: journalId, rationale: "Attempt to close while work remains.", idempotencyKey: "release4-close-ready-journal" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("links a newly prepared invoice journal to the active configured period", async () => {
+    const membership = [{ id: "manager-member", organisationId, userId: 1, branchId, role: "manager", isActive: 1 }];
+    const branch = [{ id: branchId, organisationId, isActive: 1 }];
+    const invoice = [{ id: invoiceId, organisationId, branchId, invoiceNumber: "INV-R4-500", obligationId: "obligation-r2", customerId: "customer-r2", amountMinor: "100000", currency: "NGN", issuedAt: new Date("2026-08-15T12:00:00.000Z"), status: "issued" }];
+    const period = [{ id: journalId, organisationId, branchId, status: "open", startsAt: new Date("2026-08-01T00:00:00.000Z"), endsAt: new Date("2026-08-31T23:59:59.999Z") }];
+    const accounts = [{ id: debitAccountId, organisationId, isActive: 1 }, { id: creditAccountId, organisationId, isActive: 1 }];
+    const { database, inserted } = queuedDatabase([membership, branch, invoice, period, accounts, [], []]);
+    getDbMock.mockResolvedValue(database);
+    await appRouter.createCaller(authContext()).ledger.journals.prepareInvoice({ organisationId, branchId, invoiceId, debitAccountId, creditAccountId, memo: "Invoice recognition", rationale: "Recognise invoice receivable and revenue.", idempotencyKey: "release4-period-linked-journal" });
+    expect(inserted.find(row => row.economicEventId !== undefined)).toMatchObject({ periodId: journalId, status: "ready" });
+  });
+
+  it("allows an independent authorised reviewer to close a period after ready journals are clear", async () => {
+    const membership = [{ id: "approver-member", organisationId, userId: 2, branchId, role: "approver", isActive: 1 }];
+    const branch = [{ id: branchId, organisationId, isActive: 1 }];
+    const period = [{ id: journalId, organisationId, branchId, status: "close_requested", closeRequestedByUserId: 1, startsAt: new Date("2026-08-01T00:00:00.000Z"), endsAt: new Date("2026-08-31T23:59:59.999Z") }];
+    const { database, inserted, updates } = queuedDatabase([membership, branch, period, [], []]);
+    getDbMock.mockResolvedValue(database);
+    const result = await appRouter.createCaller(authContext(2)).ledger.periods.decideClose({ organisationId, branchId, periodId: journalId, decision: "approve", rationale: "Ready journals cleared and independently reviewed.", idempotencyKey: "release4-independent-close" });
+    expect(result.replayed).toBe(false);
+    expect(updates).toEqual(expect.arrayContaining([expect.objectContaining({ status: "closed", closedByUserId: 2 })]));
+    expect(inserted.some(row => row.decision === "close_approved" && row.periodId === journalId)).toBe(true);
+  });
+
   it("prepares a source-linked, balanced invoice journal without changing the invoice or obligation", async () => {
     const membership = [{ id: "manager-member", organisationId, userId: 1, branchId, role: "manager", isActive: 1 }];
     const branch = [{ id: branchId, organisationId, isActive: 1 }];
     const invoice = [{ id: invoiceId, organisationId, branchId, invoiceNumber: "INV-R2-500", obligationId: "obligation-r2", customerId: "customer-r2", amountMinor: "100000", currency: "NGN", issuedAt: new Date(), status: "issued" }];
     const accounts = [{ id: debitAccountId, organisationId, isActive: 1 }, { id: creditAccountId, organisationId, isActive: 1 }];
-    const { database, inserted } = queuedDatabase([membership, branch, invoice, accounts, [], []]);
+    const { database, inserted } = queuedDatabase([membership, branch, invoice, [], accounts, [], []]);
     getDbMock.mockResolvedValue(database);
 
     const result = await appRouter.createCaller(authContext()).ledger.journals.prepareInvoice({ organisationId, branchId, invoiceId, debitAccountId, creditAccountId, memo: "Invoice recognition", rationale: "Recognise invoice receivable and revenue.", idempotencyKey: "release3-invoice-journal-1" });

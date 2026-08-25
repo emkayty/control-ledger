@@ -647,6 +647,46 @@ export const ledgerAccounts = mysqlTable(
   ],
 );
 
+export const accountingPeriods = mysqlTable(
+  "accountingPeriods",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    periodName: varchar("periodName", { length: 96 }).notNull(),
+    startsAt: timestamp("startsAt").notNull(),
+    endsAt: timestamp("endsAt").notNull(),
+    status: mysqlEnum("status", ["open", "close_requested", "closed"]).notNull().default("open"),
+    closeRequestedByUserId: int("closeRequestedByUserId"),
+    closeRequestedAt: timestamp("closeRequestedAt"),
+    closedByUserId: int("closedByUserId"),
+    closedAt: timestamp("closedAt"),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("accounting_period_scope_name_unique").on(table.organisationId, table.branchId, table.periodName),
+    index("accounting_period_scope_status_dates_index").on(table.organisationId, table.branchId, table.status, table.startsAt, table.endsAt),
+  ],
+);
+
+export const accountingPeriodDecisions = mysqlTable(
+  "accountingPeriodDecisions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    periodId: varchar("periodId", { length: 36 }).notNull(),
+    decision: mysqlEnum("decision", ["created", "close_requested", "close_approved", "close_rejected"]).notNull(),
+    rationale: text("rationale").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("accounting_period_decision_scope_time_index").on(table.organisationId, table.branchId, table.periodId, table.createdAt)],
+);
+
 export const ledgerJournals = mysqlTable(
   "ledgerJournals",
   {
@@ -654,6 +694,7 @@ export const ledgerJournals = mysqlTable(
     organisationId: varchar("organisationId", { length: 36 }).notNull(),
     branchId: varchar("branchId", { length: 36 }).notNull(),
     economicEventId: varchar("economicEventId", { length: 36 }).notNull(),
+    periodId: varchar("periodId", { length: 36 }),
     sourceType: varchar("sourceType", { length: 64 }).notNull(),
     sourceId: varchar("sourceId", { length: 36 }).notNull(),
     sourceReference: varchar("sourceReference", { length: 128 }),
@@ -670,6 +711,7 @@ export const ledgerJournals = mysqlTable(
   },
   table => [
     index("ledger_journal_scope_status_time_index").on(table.organisationId, table.branchId, table.status, table.preparedAt),
+    index("ledger_journal_period_index").on(table.organisationId, table.branchId, table.periodId, table.preparedAt),
     index("ledger_journal_source_index").on(table.organisationId, table.sourceType, table.sourceId),
     uniqueIndex("ledger_journal_event_unique").on(table.economicEventId),
   ],
