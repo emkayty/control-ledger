@@ -83,7 +83,8 @@
 - [x] Add a user-centred, mobile-first Release 2 operating workspace with role-specific next actions and plain business language.
 - [x] Add Release 2 privacy, retention, provider-access, and policy governance controls without weakening the existing evidence trail.
 - [x] Add automated Release 2 safety, access, and economic-linkage coverage; verify all existing tests remain passing.
-- [ ] Confirm current-checkpoint propagation on the public hosting mapping, then complete desktop/mobile production validation using authorised data only without settling the live NGN 29,997.78 variance. The configured domain now loads the authenticated Ledger shell, but the observed public Ledger view still omits the current UTC date filter and PDF-report action, so it appears to serve an earlier checkpoint.
+- [ ] Complete the remaining broader desktop/mobile production validation using authorised data only without settling the live NGN 29,997.78 variance. Current-checkpoint propagation is now verified on the public Ledger route, including the UTC date filters and Ledger PDF action.
+- [x] Restore the configured public domain to the latest current checkpoint and verify the live Ledger PDF report and UTC date filters without changing business data.
 - [x] Add a responsive footer credit reading "Developed Ace Technologies" across the authenticated application shell.
 - [x] Create a private GitHub repository and push the current Control Ledger project source, including Release 2 code and validation records.
 - [x] Define and document the Release 3 scope, business boundaries, safeguards, and acceptance criteria without altering existing Release 1–2 records.
