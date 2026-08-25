@@ -15,3 +15,7 @@ A second passive check of `/operations` still returned the hosting-level 404. Th
 A cache-busting root request using `?release2=6b77a524` also rendered the earlier Release 1 navigation. The missing Release 2 items are therefore not explained by the browser document cache observed during this check.
 
 After an additional 30-second propagation interval, a second cache-busting root request still rendered the earlier Release 1 navigation and retained the live **NGN 29,997.78** open variance view. The public route check did not create or modify any financial or control record. Release 2 route availability and genuine device acceptance must be rechecked after the hosting publication path serves checkpoint `6b77a524` (or a later verified checkpoint).
+
+The alternate public address associated with the earlier deployment notification served a **Site under maintenance** page rather than Control Ledger. It is therefore not a usable alternative Release 2 acceptance path.
+
+The configured public domain also returned the hosting-level 404 for `/__manus__/version.json`. Together with the stale root bundle, the missing direct route, unavailable production logs, and alternate maintenance page, this supports a platform hosting-mapping/publication issue rather than a Release 2 application route defect. The local preview continues to render the Release 2 routes correctly.
