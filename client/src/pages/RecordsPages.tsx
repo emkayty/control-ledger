@@ -367,7 +367,7 @@ function EvidenceUploadDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Attach receipt, invoice, or delivery proof</DialogTitle>
-          <DialogDescription>Use PDF, JPG, or PNG under 8 MB. The managed storage object is linked only after organisation and branch ownership are verified.</DialogDescription>
+          <DialogDescription>Use PDF, JPG, PNG, or WebP under 8 MB. The managed storage object is linked only after organisation and branch ownership are verified.</DialogDescription>
         </DialogHeader>
         <form className="grid gap-4" onSubmit={async event => {
           event.preventDefault();
@@ -379,7 +379,7 @@ function EvidenceUploadDialog() {
               ...scope,
               evidenceEventId: String(data.get("evidenceEventId") || "") || undefined,
               filename: selected.name,
-              contentType: selected.type as "application/pdf" | "image/jpeg" | "image/png",
+              contentType: selected.type as "application/pdf" | "image/jpeg" | "image/png" | "image/webp",
               contentBase64: await readAsBase64(selected),
               idempotencyKey: makeKey(),
             });
@@ -388,7 +388,7 @@ function EvidenceUploadDialog() {
           }
         }}>
           <select name="evidenceEventId" className="h-10 rounded-xl border bg-white px-3 text-sm" defaultValue=""><option value="">Unlinked supporting evidence</option>{evidence.data?.map(item => <option key={item.id} value={item.id}>{item.sourceReference ?? item.id.slice(0, 8)} · {item.kind.replaceAll("_", " ")}</option>)}</select>
-          <Input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
+          <Input name="file" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" required />
           <Button disabled={upload.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{upload.isPending ? "Encrypting & storing…" : "Store evidence file"}</Button>
         </form>
       </DialogContent>

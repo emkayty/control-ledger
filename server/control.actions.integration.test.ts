@@ -85,6 +85,7 @@ describe("material control action procedures", () => {
       [{ id: evidenceId, organisationId, branchId, amountMinor: "500000", currency: "NGN", occurredAt: new Date() }],
       [],
       [],
+      [],
     ]);
     getDbMock.mockResolvedValue(database);
 
@@ -93,6 +94,24 @@ describe("material control action procedures", () => {
     expect(result.replayed).toBe(false);
     expect(inserted.some(row => row.action === "reconciliation.run" && typeof row.requestHash === "string")).toBe(true);
     expect(inserted.some(row => row.matchType === "exact" && row.ruleVersion === "release-1.1")).toBe(true);
+  });
+
+  it("uses the newest append-only association correction when reconciling evidence", async () => {
+    const { database, inserted } = queuedDatabase([
+      membership,
+      branch,
+      [{ id: obligationId, organisationId, branchId, amountMinor: "500000", currency: "NGN", dueAt: new Date(Date.now() + 86_400_000) }],
+      [{ id: evidenceId, organisationId, branchId, obligationId: "stale-obligation", amountMinor: "500000", currency: "NGN", occurredAt: new Date() }],
+      [{ id: "association-correction", evidenceEventId: evidenceId, obligationId, createdAt: new Date() }],
+      [],
+      [],
+    ]);
+    getDbMock.mockResolvedValue(database);
+
+    const result = await appRouter.createCaller(authContext()).control.reconciliation.run({ organisationId, branchId, obligationId, evidenceEventId: evidenceId, treatAsShort: false, idempotencyKey: "corrected-association-match-1" });
+
+    expect(result.replayed).toBe(false);
+    expect(inserted.some(row => row.matchType === "exact" && row.evidenceEventId === evidenceId)).toBe(true);
   });
 
   it("creates a linked receivable correction instead of altering the original obligation", async () => {
@@ -108,6 +127,28 @@ describe("material control action procedures", () => {
 
     expect(result.replayed).toBe(false);
     expect(inserted.some(row => row.correctsObligationId === obligationId && row.sourceType === "correction")).toBe(true);
+  });
+
+  it("records an append-only evidence association correction for an in-scope receivable", async () => {
+    const { database, inserted } = queuedDatabase([
+      membership,
+      branch,
+      [{ id: evidenceId, customerId: "9b52d5e3-74c4-45a6-a2ec-207ab249ff0e" }],
+      [{ id: obligationId, customerId: "9b52d5e3-74c4-45a6-a2ec-207ab249ff0e" }],
+    ]);
+    getDbMock.mockResolvedValue(database);
+
+    const result = await appRouter.createCaller(authContext()).control.evidence.correctAssociation({
+      organisationId,
+      branchId,
+      evidenceEventId: evidenceId,
+      obligationId,
+      reason: "Corrected source association from intake review",
+      idempotencyKey: "evidence-association-correction-1",
+    });
+
+    expect(result.replayed).toBe(false);
+    expect(inserted.some(row => row.evidenceEventId === evidenceId && row.obligationId === obligationId && row.reason === "Corrected source association from intake review")).toBe(true);
   });
 
   it("rejects a zero-value original receivable before it can enter the control ledger", async () => {
@@ -141,6 +182,25 @@ describe("material control action procedures", () => {
     expect(result.status).toBe("quarantined");
     expect(inserted.some(row => row.status === "quarantined" && row.quarantineReason === "Amount must be a positive exact minor-unit integer.")).toBe(true);
     expect(inserted.some(row => row.action === "evidence.recorded")).toBe(false);
+  });
+
+  it("rejects evidence associated with a receivable that is outside the active branch", async () => {
+    const { database, inserted } = queuedDatabase([membership, branch, []]);
+    getDbMock.mockResolvedValue(database);
+
+    await expect(appRouter.createCaller(authContext()).control.evidence.intake({
+      organisationId,
+      branchId,
+      obligationId,
+      kind: "payment_observation",
+      amountMinor: "500000",
+      currency: "NGN",
+      sourceName: "Bank feed",
+      sourceReference: "OUT-OF-SCOPE-RECEIVABLE-1",
+      idempotencyKey: "invalid-evidence-link-1",
+    })).rejects.toThrow("selected receivable is not in the active branch");
+
+    expect(inserted).toHaveLength(0);
   });
 
   it("applies approval only from an eligible, non-initiating actor", async () => {

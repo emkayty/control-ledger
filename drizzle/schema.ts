@@ -152,6 +152,24 @@ export const evidenceEvents = mysqlTable(
   ],
 );
 
+export const evidenceAssociationCorrections = mysqlTable(
+  "evidenceAssociationCorrections",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    evidenceEventId: varchar("evidenceEventId", { length: 36 }).notNull(),
+    obligationId: varchar("obligationId", { length: 36 }).notNull(),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("evidence_association_correction_scope_index").on(table.organisationId, table.branchId, table.evidenceEventId, table.createdAt),
+  ],
+);
+
 export const evidenceFiles = mysqlTable(
   "evidenceFiles",
   {

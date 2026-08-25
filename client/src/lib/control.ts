@@ -15,6 +15,25 @@ export function formatMoney(minor: string | null | undefined, currency = "NGN") 
   return `${negative ? "−" : ""}${currency} ${major}.${cents}`;
 }
 
+export function getLiveValidationGuidance(recordedEvidence: number, unresolvedExceptions: number) {
+  if (recordedEvidence === 0) {
+    return {
+      title: "Requires authorised live validation",
+      message: "A real evidence record is still needed to exercise the live match and exception path; an authorised branch name and code are still needed to test workspace switching in your operating context.",
+    };
+  }
+  if (unresolvedExceptions > 0) {
+    return {
+      title: "Live evidence validation recorded",
+      message: "An independent proof is stored and its variance is visible for accountable review. An authorised branch name and code are still needed to test workspace switching in your operating context.",
+    };
+  }
+  return {
+    title: "Live evidence validation recorded",
+    message: "An independent proof is stored and reconciled in the live workflow. An authorised branch name and code are still needed to test workspace switching in your operating context.",
+  };
+}
+
 export function statusTone(status: string) {
   if (["verified", "resolved", "settled"].includes(status)) return "bg-emerald-50 text-emerald-700 ring-emerald-600/15";
   if (["matched", "partially_paid", "recorded"].includes(status)) return "bg-sky-50 text-sky-700 ring-sky-600/15";

@@ -8,12 +8,18 @@
 - [x] Require positive exact money values for original receivable and evidence records while preserving signed append-only corrections.
 - [x] Implement linked, append-only receivable and evidence correction APIs that preserve the original record and record a correction reference, reason, actor, and correlation ID.
 - [x] Implement secure evidence-file upload metadata and controlled retrieval using managed object storage rather than database blobs.
+- [x] Allow validated WebP receipt images in the controlled evidence-file workflow and test the format boundary.
+- [x] Validate optional evidence obligation and customer identifiers against the selected organisation and branch before storing source associations.
+- [x] Add an append-only evidence-association correction record and effective-link resolution so a wrongly associated source record can be corrected without mutation.
+- [x] Make association-dependent reconciliation use the latest append-only evidence association correction and prove this with integration coverage.
+- [x] Use the authorised correction path to re-associate the live OPay evidence with receivable `22232`, then revalidate its reconciliation, exception, and audit history.
 - [x] Validate linked evidence-event and exception ownership before storing evidence-file metadata, and test cross-tenant or cross-branch link rejection.
 - [x] Implement deterministic reconciliation for exact, partial, short, duplicate, delayed, and unmatched evidence, preserving rule and source provenance.
 - [x] Strengthen reconciliation allocation for split payments and one-payment-to-many-obligation flows, preventing over-allocation of either side.
 - [x] Correct the material-action database test double so related reconciliation-link queries behave like executable Drizzle queries.
 - [x] Align and verify the reconciliation procedure assertion with the upgraded allocation rule version.
 - [x] Add and verify a user-visible real-world scenario coverage guide that distinguishes implemented controls from live-validation-dependent flows.
+- [x] Make the dashboard’s live-validation guidance data-aware once authorised evidence and a resulting variance are recorded.
 - [x] Verify the full reconciliation taxonomy in the live schema and interface, including distinct partial-payment and short-payment review outcomes.
 - [x] Implement approval-aware exception lifecycle APIs with type, severity, value impact, owner, due date, notes, evidence references, and resolution history.
 - [x] Add visible exception note history and note entry controls to the responsive investigation view.

@@ -7,6 +7,7 @@ import {
   branches,
   controlExceptions,
   customers,
+  evidenceAssociationCorrections,
   evidenceEvents,
   evidenceFiles,
   exceptionNotes,
@@ -20,6 +21,7 @@ import {
 } from "../../drizzle/schema";
 import { requireScopedMembership, permissions } from "../control/access";
 import { assertEvidenceFileInput, assertEvidenceLinkScope } from "../control/fileSecurity";
+import { latestEvidenceAssociation } from "../control/evidenceAssociation";
 import { assertMinorAmount, assertPositiveMinorAmount, isPositiveMinorAmount } from "../control/money";
 import { calculateAvailableAllocation, determineReconciliation } from "../control/reconciliation";
 import { getDb } from "../db";
@@ -125,7 +127,7 @@ const uploadInput = z.object({
   evidenceEventId: z.string().uuid().optional(),
   exceptionId: z.string().uuid().optional(),
   filename: z.string().min(1).max(180),
-  contentType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
+  contentType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
   contentBase64: z.string().min(1).max(10_700_000),
   idempotencyKey: z.string().min(8).max(128),
 });
@@ -406,21 +408,32 @@ export const controlRouter = router({
   evidence: router({
     list: protectedProcedure.input(controlScope).query(async ({ ctx, input }) => {
       const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.read });
-      const [events, links] = await Promise.all([
+      const [events, links, associationCorrections] = await Promise.all([
         db.select().from(evidenceEvents).where(and(eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, input.branchId))).orderBy(desc(evidenceEvents.recordedAt)),
         db.select().from(reconciliationLinks).where(eq(reconciliationLinks.organisationId, input.organisationId)),
+        db.select().from(evidenceAssociationCorrections).where(and(eq(evidenceAssociationCorrections.organisationId, input.organisationId), eq(evidenceAssociationCorrections.branchId, input.branchId))).orderBy(desc(evidenceAssociationCorrections.createdAt)),
       ]);
       return events.map(event => {
         const eventLinks = links.filter(item => item.evidenceEventId === event.id);
         const allocatedMinor = eventLinks.reduce((sum, link) => sum + BigInt(link.allocatedMinor), BigInt(0));
         const controlStatus = eventLinks.length ? (allocatedMinor >= BigInt(event.amountMinor ?? "0") ? "matched" : "unresolved") : event.status;
-        return { ...event, controlStatus, reconciliation: eventLinks, allocatedMinor: allocatedMinor.toString() };
+        const associationCorrection = latestEvidenceAssociation(associationCorrections, event.id);
+        return { ...event, recordedObligationId: event.obligationId, obligationId: associationCorrection?.obligationId ?? event.obligationId, associationCorrectionId: associationCorrection?.id, controlStatus, reconciliation: eventLinks, allocatedMinor: allocatedMinor.toString() };
       });
     }),
     intake: protectedProcedure
       .input(controlScope.extend({ obligationId: z.string().uuid().optional(), customerId: z.string().uuid().optional(), kind: z.enum(["delivery_observation", "payment_observation", "settlement_evidence"]), amountMinor: z.string(), currency: z.string().length(3).transform(value => value.toUpperCase()), sourceName: z.string().min(2).max(96), sourceReference: z.string().min(2).max(160), sourceMetadata: z.record(z.string(), z.string()).optional(), occurredAt: z.coerce.date().optional(), idempotencyKey: z.string().min(8).max(128) }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.recordEvidence });
+        if (input.obligationId) {
+          const [obligation] = await db.select({ id: receivableObligations.id, customerId: receivableObligations.customerId }).from(receivableObligations).where(and(eq(receivableObligations.id, input.obligationId), eq(receivableObligations.organisationId, input.organisationId), eq(receivableObligations.branchId, input.branchId))).limit(1);
+          if (!obligation) throw new TRPCError({ code: "NOT_FOUND", message: "The selected receivable is not in the active branch." });
+          if (input.customerId && obligation.customerId !== input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "The selected customer does not own the selected receivable." });
+        }
+        if (input.customerId) {
+          const customer = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.id, input.customerId), eq(customers.organisationId, input.organisationId), eq(customers.branchId, input.branchId))).limit(1);
+          if (!customer[0]) throw new TRPCError({ code: "NOT_FOUND", message: "The selected customer is not in the active branch." });
+        }
         const duplicate = await db.select({ id: integrationIntakeRecords.id }).from(integrationIntakeRecords).where(and(eq(integrationIntakeRecords.organisationId, input.organisationId), eq(integrationIntakeRecords.sourceName, input.sourceName), eq(integrationIntakeRecords.sourceReference, input.sourceReference))).limit(1);
         if (duplicate[0]) return { status: "duplicate" as const, intakeId: duplicate[0].id };
         if (!isPositiveMinorAmount(input.amountMinor)) {
@@ -457,6 +470,25 @@ export const controlRouter = router({
             const entityId = recordId(); const correlationId = correlation();
             await db.insert(evidenceEvents).values({ id: entityId, organisationId: original.organisationId, branchId: original.branchId, obligationId: original.obligationId, customerId: original.customerId, kind: "correction", status: "recorded", amountMinor: input.amountMinor, currency: original.currency, sourceName: "correction", sourceReference: `${original.id}-COR-${entityId.slice(0, 6).toUpperCase()}`, sourceMetadata: { reason: input.reason, originalEvidenceEventId: original.id }, occurredAt: new Date(), correlationId, correctsEventId: original.id, createdByUserId: ctx.user.id });
             await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.correction_recorded", entityType: "evidence_event", entityId, correlationId, metadata: { correctsEventId: original.id, reason: input.reason, amountMinor: input.amountMinor } });
+            return { entityId, correlationId };
+          },
+        });
+      }),
+    correctAssociation: protectedProcedure
+      .input(controlScope.extend({ evidenceEventId: z.string().uuid(), obligationId: z.string().uuid(), reason: z.string().min(4).max(500), idempotencyKey: z.string().min(8).max(128) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.recordEvidence });
+        const [evidence] = await db.select({ id: evidenceEvents.id, customerId: evidenceEvents.customerId }).from(evidenceEvents).where(and(eq(evidenceEvents.id, input.evidenceEventId), eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, input.branchId))).limit(1);
+        if (!evidence) throw new TRPCError({ code: "NOT_FOUND", message: "The original evidence is not in the active branch." });
+        const [obligation] = await db.select({ id: receivableObligations.id, customerId: receivableObligations.customerId }).from(receivableObligations).where(and(eq(receivableObligations.id, input.obligationId), eq(receivableObligations.organisationId, input.organisationId), eq(receivableObligations.branchId, input.branchId))).limit(1);
+        if (!obligation) throw new TRPCError({ code: "NOT_FOUND", message: "The corrected receivable is not in the active branch." });
+        if (evidence.customerId && evidence.customerId !== obligation.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "The corrected receivable does not belong to the evidence customer." });
+        return getOrCreateIdempotent({
+          organisationId: input.organisationId, userId: ctx.user.id, action: "evidence.correct_association", idempotencyKey: input.idempotencyKey, request: input,
+          execute: async () => {
+            const entityId = recordId(); const correlationId = correlation();
+            await db.insert(evidenceAssociationCorrections).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, evidenceEventId: input.evidenceEventId, obligationId: input.obligationId, reason: input.reason, correlationId, createdByUserId: ctx.user.id });
+            await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.association_corrected", entityType: "evidence_association_correction", entityId, correlationId, metadata: { evidenceEventId: input.evidenceEventId, obligationId: input.obligationId, reason: input.reason } });
             return { entityId, correlationId };
           },
         });
@@ -521,6 +553,9 @@ export const controlRouter = router({
         const [obligation] = await db.select().from(receivableObligations).where(and(eq(receivableObligations.id, input.obligationId), eq(receivableObligations.organisationId, input.organisationId), eq(receivableObligations.branchId, input.branchId))).limit(1);
         const [evidence] = await db.select().from(evidenceEvents).where(and(eq(evidenceEvents.id, input.evidenceEventId), eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, input.branchId))).limit(1);
         if (!obligation || !evidence || !evidence.amountMinor || evidence.currency !== obligation.currency) throw new TRPCError({ code: "BAD_REQUEST", message: "An in-scope, same-currency obligation and monetary evidence event are required." });
+        const associationCorrections = await db.select().from(evidenceAssociationCorrections).where(and(eq(evidenceAssociationCorrections.organisationId, input.organisationId), eq(evidenceAssociationCorrections.branchId, input.branchId), eq(evidenceAssociationCorrections.evidenceEventId, evidence.id)));
+        const effectiveObligationId = latestEvidenceAssociation(associationCorrections, evidence.id)?.obligationId ?? evidence.obligationId;
+        if (effectiveObligationId && effectiveObligationId !== obligation.id) throw new TRPCError({ code: "BAD_REQUEST", message: "The evidence is associated with a different receivable in the active branch." });
         const existing = await db.select({ id: reconciliationLinks.id }).from(reconciliationLinks).where(and(eq(reconciliationLinks.obligationId, obligation.id), eq(reconciliationLinks.evidenceEventId, evidence.id))).limit(1);
         const relatedLinks = await db.select({ obligationId: reconciliationLinks.obligationId, evidenceEventId: reconciliationLinks.evidenceEventId, allocatedMinor: reconciliationLinks.allocatedMinor }).from(reconciliationLinks).where(and(eq(reconciliationLinks.organisationId, input.organisationId), or(eq(reconciliationLinks.obligationId, obligation.id), eq(reconciliationLinks.evidenceEventId, evidence.id))));
         const alreadyAllocatedToObligation = relatedLinks.filter(link => link.obligationId === obligation.id).reduce((sum, link) => sum + BigInt(link.allocatedMinor), BigInt(0)).toString();
