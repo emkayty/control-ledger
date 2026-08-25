@@ -5,7 +5,7 @@ const { getDbMock } = vi.hoisted(() => ({ getDbMock: vi.fn() }));
 vi.mock("./db", () => ({ getDb: getDbMock }));
 
 import { appRouter } from "./routers";
-import { ledgerMath } from "./routers/ledger";
+import { journalPreparedAtRange, ledgerMath } from "./routers/ledger";
 
 type Recorded = Record<string, unknown>;
 
@@ -45,6 +45,17 @@ describe("Release 3 ledger controls", () => {
   it("requires exact balanced journal totals with positive debit and credit value", () => {
     expect(ledgerMath.assertBalanced([{ debitMinor: "250", creditMinor: "0" }, { debitMinor: "0", creditMinor: "250" }]).toString()).toBe("250");
     expect(() => ledgerMath.assertBalanced([{ debitMinor: "250", creditMinor: "0" }, { debitMinor: "0", creditMinor: "249" }])).toThrow("balance exactly");
+  });
+
+  it("converts a selected journal period into inclusive UTC day boundaries", () => {
+    const range = journalPreparedAtRange({ fromDate: "2026-08-01", toDate: "2026-08-25" });
+    expect(range.from?.toISOString()).toBe("2026-08-01T00:00:00.000Z");
+    expect(range.to?.toISOString()).toBe("2026-08-25T23:59:59.999Z");
+  });
+
+  it("rejects an inverted journal date range before database access", async () => {
+    await expect(appRouter.createCaller(authContext()).ledger.journals.list({ organisationId, branchId, fromDate: "2026-08-26", toDate: "2026-08-25" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(getDbMock).not.toHaveBeenCalled();
   });
 
   it("denies an operator chart-of-accounts access despite valid branch membership", async () => {

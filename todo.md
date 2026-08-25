@@ -96,3 +96,7 @@
 - [x] Add exact balanced-journal preparation, independent source-linked posting, and immutable correction/reversal controls for new Release 3 ledger consequences.
 - [x] Add derived account balances and a mobile-first Ledger workspace that distinguishes draft, ready for independent posting, posted, and reversal/correction states.
 - [x] Add an active-scope CSV export for derived Ledger account balances and journal-entry lines, with safe CSV escaping and no financial-record mutation.
+- [x] Add a formatted, active-scope PDF Ledger report for derived account balances and journal-entry lines without changing financial records.
+- [x] Add validated inclusive date-range filtering to Ledger journal views and CSV/PDF exports, using UTC persistence timestamps and clear empty-range handling.
+- [x] Consolidate Release 1–3 as one aligned control baseline across navigation, role-aware workflows, documentation, and verification records without claiming unresolved external gates are complete.
+- [x] Reconcile and document which remaining tasks require external provider action, hosting remediation, or genuine authorised real-device acceptance rather than further code changes.

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditEvents,
@@ -18,6 +18,10 @@ import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const scopeInput = z.object({ organisationId: z.string().uuid(), branchId: z.string().uuid() });
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use an ISO date in YYYY-MM-DD format.");
+const journalListInput = scopeInput.extend({ fromDate: dateOnly.optional(), toDate: dateOnly.optional() }).superRefine((input, ctx) => {
+  if (input.fromDate && input.toDate && input.fromDate > input.toDate) ctx.addIssue({ code: "custom", message: "The end date must be on or after the start date.", path: ["toDate"] });
+});
 const idempotencyInput = z.object({ idempotencyKey: z.string().min(8).max(128) });
 const recordId = () => crypto.randomUUID();
 const correlation = () => crypto.randomUUID();
@@ -45,6 +49,13 @@ function assertBalanced(lines: Array<{ debitMinor: string; creditMinor: string }
 }
 
 export const ledgerMath = { assertBalanced };
+
+export function journalPreparedAtRange(input: { fromDate?: string; toDate?: string }) {
+  return {
+    from: input.fromDate ? new Date(`${input.fromDate}T00:00:00.000Z`) : undefined,
+    to: input.toDate ? new Date(`${input.toDate}T23:59:59.999Z`) : undefined,
+  };
+}
 
 async function scopedDb(input: { organisationId: string; branchId: string; userId: number; allowed: readonly any[] }) {
   await requireScopedMembership(input);
@@ -137,10 +148,14 @@ export const ledgerRouter = router({
     }),
   }),
   journals: router({
-    list: protectedProcedure.input(scopeInput).query(async ({ ctx, input }) => {
+    list: protectedProcedure.input(journalListInput).query(async ({ ctx, input }) => {
       const db = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.read });
+      const range = journalPreparedAtRange(input);
+      const journalConditions = [eq(ledgerJournals.organisationId, input.organisationId), eq(ledgerJournals.branchId, input.branchId)];
+      if (range.from) journalConditions.push(gte(ledgerJournals.preparedAt, range.from));
+      if (range.to) journalConditions.push(lte(ledgerJournals.preparedAt, range.to));
       const [journals, lines, decisions] = await Promise.all([
-        db.select().from(ledgerJournals).where(and(eq(ledgerJournals.organisationId, input.organisationId), eq(ledgerJournals.branchId, input.branchId))).orderBy(desc(ledgerJournals.preparedAt)),
+        db.select().from(ledgerJournals).where(and(...journalConditions)).orderBy(desc(ledgerJournals.preparedAt)),
         db.select().from(ledgerJournalLines).where(and(eq(ledgerJournalLines.organisationId, input.organisationId), eq(ledgerJournalLines.branchId, input.branchId))),
         db.select().from(ledgerJournalDecisions).where(and(eq(ledgerJournalDecisions.organisationId, input.organisationId), eq(ledgerJournalDecisions.branchId, input.branchId))).orderBy(desc(ledgerJournalDecisions.createdAt)),
       ]);
