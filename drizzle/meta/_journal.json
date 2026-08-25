@@ -57,6 +57,13 @@
       "when": 1787668498120,
       "tag": "0007_illegal_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787672080305,
+      "tag": "0008_brown_captain_britain",
+      "breakpoints": true
     }
   ]
 }

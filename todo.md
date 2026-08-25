@@ -86,3 +86,12 @@
 - [ ] Restore or verify the public hosting mapping so it serves the latest Release 2 checkpoint (the configured domain currently serves a stale Release 1 bundle, direct Release 2 routes/version marker return hosting-level 404, and the alternate address is under maintenance); then complete desktop/mobile production validation using authorised data only, without settling the live NGN 29,997.78 variance.
 - [x] Add a responsive footer credit reading "Developed Ace Technologies" across the authenticated application shell.
 - [x] Create a private GitHub repository and push the current Control Ledger project source, including Release 2 code and validation records.
+- [x] Define and document the Release 3 scope, business boundaries, safeguards, and acceptance criteria without altering existing Release 1–2 records.
+- [x] Assess the current Release 2 economic model and select the next additive Release 3 control domain.
+- [x] Implement the approved Release 3 data model, protected services, and role-aware controls using append-only, idempotent, audited writes.
+- [x] Add compact mobile-first Release 3 workflows with explicit loading, error, and recovery states.
+- [x] Add and run Release 3 security, access, economic-integrity, and regression tests without fabricating operating data.
+- [x] Validate Release 3 in the authorised preview and document any remaining production or external-provider gates.
+- [x] Add an append-only canonical economic-event envelope and scoped chart-of-accounts model without backfilling historical Release 1–2 facts.
+- [x] Add exact balanced-journal preparation, independent source-linked posting, and immutable correction/reversal controls for new Release 3 ledger consequences.
+- [x] Add derived account balances and a mobile-first Ledger workspace that distinguishes draft, ready for independent posting, posted, and reversal/correction states.

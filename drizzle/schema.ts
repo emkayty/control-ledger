@@ -602,6 +602,115 @@ export const evidenceRetentionReviews = mysqlTable(
   table => [index("evidence_retention_scope_index").on(table.organisationId, table.branchId, table.evidenceFileId, table.createdAt)],
 );
 
+export const economicEvents = mysqlTable(
+  "economicEvents",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    eventType: varchar("eventType", { length: 96 }).notNull(),
+    status: mysqlEnum("status", ["recorded", "ready_to_post", "posted", "reversed"]).notNull().default("recorded"),
+    sourceType: varchar("sourceType", { length: 64 }).notNull(),
+    sourceId: varchar("sourceId", { length: 36 }),
+    sourceReference: varchar("sourceReference", { length: 128 }),
+    causalEventId: varchar("causalEventId", { length: 36 }),
+    payloadVersion: int("payloadVersion").notNull().default(1),
+    payload: json("payload"),
+    occurredAt: timestamp("occurredAt").notNull(),
+    recordedAt: timestamp("recordedAt").defaultNow().notNull(),
+    actorUserId: int("actorUserId").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+  },
+  table => [
+    uniqueIndex("economic_event_source_unique").on(table.organisationId, table.eventType, table.sourceType, table.sourceId),
+    index("economic_event_scope_status_time_index").on(table.organisationId, table.branchId, table.status, table.occurredAt),
+    index("economic_event_correlation_index").on(table.correlationId),
+  ],
+);
+
+export const ledgerAccounts = mysqlTable(
+  "ledgerAccounts",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    code: varchar("code", { length: 32 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    accountClass: mysqlEnum("accountClass", ["asset", "liability", "equity", "revenue", "expense"]).notNull(),
+    normalBalance: mysqlEnum("normalBalance", ["debit", "credit"]).notNull(),
+    isActive: int("isActive").notNull().default(1),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("ledger_account_org_code_unique").on(table.organisationId, table.code),
+    index("ledger_account_org_active_index").on(table.organisationId, table.isActive, table.accountClass),
+  ],
+);
+
+export const ledgerJournals = mysqlTable(
+  "ledgerJournals",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    economicEventId: varchar("economicEventId", { length: 36 }).notNull(),
+    sourceType: varchar("sourceType", { length: 64 }).notNull(),
+    sourceId: varchar("sourceId", { length: 36 }).notNull(),
+    sourceReference: varchar("sourceReference", { length: 128 }),
+    status: mysqlEnum("status", ["draft", "ready", "posted", "reversed"]).notNull().default("draft"),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    memo: varchar("memo", { length: 500 }).notNull(),
+    reversalOfJournalId: varchar("reversalOfJournalId", { length: 36 }),
+    preparedAt: timestamp("preparedAt").defaultNow().notNull(),
+    preparedByUserId: int("preparedByUserId").notNull(),
+    postedAt: timestamp("postedAt"),
+    postedByUserId: int("postedByUserId"),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("ledger_journal_scope_status_time_index").on(table.organisationId, table.branchId, table.status, table.preparedAt),
+    index("ledger_journal_source_index").on(table.organisationId, table.sourceType, table.sourceId),
+    uniqueIndex("ledger_journal_event_unique").on(table.economicEventId),
+  ],
+);
+
+export const ledgerJournalLines = mysqlTable(
+  "ledgerJournalLines",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    journalId: varchar("journalId", { length: 36 }).notNull(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    accountId: varchar("accountId", { length: 36 }).notNull(),
+    debitMinor: decimal("debitMinor", { precision: 20, scale: 0 }).notNull().default("0"),
+    creditMinor: decimal("creditMinor", { precision: 20, scale: 0 }).notNull().default("0"),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    memo: varchar("memo", { length: 500 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("ledger_journal_line_journal_index").on(table.journalId),
+    index("ledger_journal_line_account_index").on(table.organisationId, table.branchId, table.accountId),
+  ],
+);
+
+export const ledgerJournalDecisions = mysqlTable(
+  "ledgerJournalDecisions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    journalId: varchar("journalId", { length: 36 }).notNull(),
+    decision: mysqlEnum("decision", ["prepared", "submitted", "posted", "reversed"]).notNull(),
+    rationale: text("rationale").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("ledger_journal_decision_time_index").on(table.organisationId, table.branchId, table.journalId, table.createdAt)],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Organisation = typeof organisations.$inferSelect;

@@ -20,6 +20,9 @@ export const permissions = {
   manageInventory: ["owner", "controller", "manager"],
   manageCollections: ["owner", "controller", "operator", "manager"],
   manageEvidenceGovernance: ["owner"],
+  manageLedgerAccounts: ["owner", "controller"],
+  prepareLedgerJournal: ["owner", "controller", "manager"],
+  postLedgerJournal: ["owner", "controller", "approver"],
 } as const;
 
 export function canPerform(role: ControlRole, action: keyof typeof permissions) {

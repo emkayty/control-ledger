@@ -3,7 +3,7 @@ import { startLogin } from "@/const";
 import { ControlScopeProvider } from "@/contexts/ControlScopeContext";
 import type { ControlScope } from "@/lib/control";
 import { trpc } from "@/lib/trpc";
-import { AlertTriangle, ArrowUpRight, Building2, CircleUserRound, FileCheck2, History, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, Sparkles, UsersRound, Warehouse, WalletCards } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, BookOpenCheck, Building2, CircleUserRound, FileCheck2, History, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, Sparkles, UsersRound, Warehouse, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
@@ -18,6 +18,7 @@ const navigation = [
   { href: "/evidence", label: "Evidence intake", icon: FileCheck2 },
   { href: "/operations", label: "Operations", icon: Warehouse },
   { href: "/collections", label: "Collections", icon: WalletCards },
+  { href: "/ledger", label: "Ledger", icon: BookOpenCheck },
   { href: "/exceptions", label: "Exceptions", icon: AlertTriangle },
   { href: "/access", label: "People & access", icon: UsersRound },
   { href: "/audit", label: "Audit trail", icon: History },
