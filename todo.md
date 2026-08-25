@@ -95,3 +95,4 @@
 - [x] Add an append-only canonical economic-event envelope and scoped chart-of-accounts model without backfilling historical Release 1–2 facts.
 - [x] Add exact balanced-journal preparation, independent source-linked posting, and immutable correction/reversal controls for new Release 3 ledger consequences.
 - [x] Add derived account balances and a mobile-first Ledger workspace that distinguishes draft, ready for independent posting, posted, and reversal/correction states.
+- [x] Add an active-scope CSV export for derived Ledger account balances and journal-entry lines, with safe CSV escaping and no financial-record mutation.
