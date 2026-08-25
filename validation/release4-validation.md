@@ -21,3 +21,7 @@ Release 4 adds **accounting-period governance** to the Release 3 ledger without 
 ## Preserved facts and remaining gates
 
 The live Release 1 OPay evidence trail, reconciliation history, and **NGN 29,997.78** open variance remain unchanged. Release 4 is not a statutory close, tax filing, inventory valuation, bank/PSP integration, external accounting sync, or production certification. The existing provider-level legacy receipt-object remediation and genuine authorised real-device acceptance remain external, incomplete gates.
+
+## Public propagation observation
+
+Immediately after checkpoint `d66fb1fb`, two cache-busted checks of the configured public `/ledger` route still showed the earlier Release 3 Ledger interface without the **Release 4 · accounting periods** panel. The current Release 4 behaviour is validated in the authorised development preview, but current-version public propagation remains unverified and must not be represented as live until the public route updates.
