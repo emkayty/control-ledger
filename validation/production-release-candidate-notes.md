@@ -53,3 +53,15 @@ A subsequent signed-in production check continued to return the preceding contro
 After the final assessment checkpoint propagated, the signed-in Main-branch production evidence page displayed the deployed fail-closed state: **“OPay extraction is disabled for this organisation”**, the processing-scope and retention-boundary notice, and the owner-only **“Review processing notice”** control. The prior direct extraction button was absent. The stored receipt Preview control and the existing high-confidence human-review proposal remained present. No extraction, evidence form submission, resolution, approval, or settlement action was taken.
 
 The authorised Preview action was then exercised without changing any record. It opened the controlled receipt modal successfully and used a provider-signed URL with an expiry parameter and signature, rather than returning a raw storage key or raw storage URL in the application control. The modal was not used to submit, extract, reconcile, resolve, or approve anything.
+
+## 25 August 2026 — transaction-hardening production smoke check
+
+The signed-in Main-branch production dashboard loaded after the transaction-hardening checkpoint. It showed a receivable position of **NGN 2.22**, reconciled value of **NGN 2.22**, **1** unresolved exception, and the organisation variance watch at **1 open / NGN 29,997.78** in Main branch. This observation confirms the live state remained stable; no business action was taken.
+
+The signed-in Main-branch Exceptions page then showed the same **open** unmatched-record exception with **NGN 29,997.78** value impact, a blank “Record the proposed resolution and investigation basis” field, and **Submit for approval**. No investigation note, resolution proposal, approval, or return decision was entered.
+
+The signed-in Audit trail also loaded successfully. It showed the existing receipt-extraction proposal event, evidence association correction, reconciliation completion, file upload, evidence record, receivable obligation, customer creation, and workspace bootstrap events with actors, timestamps, and correlation identifiers. No new audit event was intentionally created during this check.
+
+## 25 August 2026 — proposal-history verification
+
+Read-only verification found two append-only high-confidence OPay proposals for the same authorised receipt file: the original proposal and a later proposal created before the organisation-level policy propagated. The evidence and control state remain unchanged: the exception is still **open**, with **2,999,778 minor NGN** value impact, no resolution note, and no resolved timestamp. The deployed organisation policy is now disabled, so no further OPay extraction may run until an owner explicitly accepts the notice and enables it.

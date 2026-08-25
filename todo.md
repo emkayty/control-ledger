@@ -73,3 +73,4 @@
 - [ ] Address legacy raw managed-storage URLs already exposed by the hosting-layer storage endpoint; newly issued controlled previews now use the application’s authenticated API route, but old object URLs require platform-level revocation or object rotation.
 - [x] Compare the supplied revised business thesis and target technical architecture against the current Control Ledger implementation, identifying alignment, gaps, and phased decisions.
 - [x] Compare the newly supplied architecture document with the prior thesis and identify any material additions, contradictions, or roadmap changes.
+- [x] Produce a plain-language, locally grounded business guide explaining Control Ledger’s value, operating logic, market alternatives, differentiation, and user-centred simplification path.
