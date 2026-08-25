@@ -24,4 +24,4 @@ The live Release 1 OPay evidence trail, reconciliation history, and **NGN 29,997
 
 ## Public propagation observation
 
-Immediately after checkpoint `d66fb1fb`, two cache-busted checks of the configured public `/ledger` route still showed the earlier Release 3 Ledger interface without the **Release 4 · accounting periods** panel. The current Release 4 behaviour is validated in the authorised development preview, but current-version public propagation remains unverified and must not be represented as live until the public route updates.
+Immediately after checkpoint `d66fb1fb`, two cache-busted checks of the configured public `/ledger` route still showed the earlier Release 3 Ledger interface without the **Release 4 · accounting periods** panel. After the Release 4 follow-up checkpoint and a final cache-busted check, the public route displayed the **Release 4 · accounting periods** panel, **Period** action, and controlled no-period state. Release 4 accounting-period governance is now live on the configured public domain. No public-page action created or changed a business record.

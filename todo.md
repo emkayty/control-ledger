@@ -84,7 +84,7 @@
 - [x] Add Release 2 privacy, retention, provider-access, and policy governance controls without weakening the existing evidence trail.
 - [x] Add automated Release 2 safety, access, and economic-linkage coverage; verify all existing tests remain passing.
 - [ ] Complete the remaining broader desktop/mobile production validation using authorised data only without settling the live NGN 29,997.78 variance. Current-checkpoint propagation is now verified on the public Ledger route, including the UTC date filters and Ledger PDF action.
-- [ ] Verify current Release 4 checkpoint propagation on the public Ledger route, including the accounting-period panel, before treating period governance as live for users.
+- [x] Verify current Release 4 checkpoint propagation on the public Ledger route, including the accounting-period panel, before treating period governance as live for users.
 - [x] Restore the configured public domain to the latest current checkpoint and verify the live Ledger PDF report and UTC date filters without changing business data.
 - [x] Add a responsive footer credit reading "Developed Ace Technologies" across the authenticated application shell.
 - [x] Create a private GitHub repository and push the current Control Ledger project source, including Release 2 code and validation records.
