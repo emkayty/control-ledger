@@ -63,6 +63,18 @@ function auditDatabase() {
   };
 }
 
+function portfolioDatabase(membership: { organisationId: string; userId: number; branchId: string | null; role: string; isActive: number }, exceptionRows: Array<{ branchId: string; status: string; currency: string | null; valueImpactMinor: string | null }>, branchRows: Array<{ id: string; name: string; code: string }>) {
+  let calls = 0;
+  return {
+    select: () => {
+      calls += 1;
+      if (calls === 1) return { from: () => ({ where: () => ({ limit: async () => [membership] }) }) };
+      const rows = calls === 2 ? exceptionRows : branchRows;
+      return { from: () => ({ where: async () => rows }) };
+    },
+  };
+}
+
 describe("control workspace protected procedure integration", () => {
   beforeEach(() => getDbMock.mockReset());
 
@@ -123,5 +135,29 @@ describe("control workspace protected procedure integration", () => {
     getDbMock.mockResolvedValue({ select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) });
     const caller = appRouter.createCaller(authContext({ id: 7, openId: "unauthorised-user", email: "unauthorised@example.com", name: "Unauthorised", loginMethod: "manus", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }));
     await expect(caller.control.audit.list({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f4f9d9c3", limit: 50 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("returns organisation-wide unresolved variance totals and branch groupings only to an owner or controller", async () => {
+    const organisationId = "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0";
+    const mainBranchId = "f894a6a4-b488-48f1-9e45-dba4f4f9d9c3";
+    const kadunaBranchId = "a9ea64b9-932f-4eb8-a20c-d7b4521b7959";
+    const user = { id: 1, openId: "scope-test-user", email: "scope@example.com", name: "Scope Test", loginMethod: "manus", role: "user" as const, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
+    const branches = [{ id: mainBranchId, name: "Main", code: "MAIN" }, { id: kadunaBranchId, name: "Kaduna", code: "KAD-09" }];
+    const exceptions = [
+      { branchId: mainBranchId, status: "open", currency: "NGN", valueImpactMinor: "2999778" },
+      { branchId: kadunaBranchId, status: "pending_approval", currency: "NGN", valueImpactMinor: "500" },
+      { branchId: mainBranchId, status: "resolved", currency: "NGN", valueImpactMinor: "100" },
+    ];
+
+    getDbMock.mockResolvedValue(portfolioDatabase({ organisationId, userId: user.id, branchId: null, role: "owner", isActive: 1 }, exceptions, branches));
+    const result = await appRouter.createCaller(authContext(user)).control.variancePortfolio({ organisationId });
+
+    expect(result).toEqual({ visibility: "organisation", openCount: 2, totals: { NGN: "3000278" }, branches: [
+      { branchId: kadunaBranchId, branchName: "Kaduna", branchCode: "KAD-09", count: 1, totals: { NGN: "500" } },
+      { branchId: mainBranchId, branchName: "Main", branchCode: "MAIN", count: 1, totals: { NGN: "2999778" } },
+    ] });
+
+    getDbMock.mockResolvedValue(portfolioDatabase({ organisationId, userId: user.id, branchId: mainBranchId, role: "operator", isActive: 1 }, exceptions, branches));
+    await expect(appRouter.createCaller(authContext(user)).control.variancePortfolio({ organisationId })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

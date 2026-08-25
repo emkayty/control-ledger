@@ -54,5 +54,8 @@
 - [x] Add controlled receipt image previews that use authorised managed-file retrieval rather than public file access.
 - [x] Add OPay-focused receipt extraction that proposes fields for human confirmation without overwriting user-entered evidence or treating extraction as settlement confirmation.
 - [ ] Add automated coverage and signed-in desktop/mobile validation for approval, cross-branch variance, preview, and extraction workflows.
-- [ ] Add targeted automated coverage for the variance portfolio query, controlled OPay extraction success/failure paths, and preview/proposal UI behavior.
+- [x] Add targeted automated coverage for the variance portfolio query, controlled OPay extraction success/failure paths, and preview/proposal UI behavior.
+- [x] Add a protected router test for the actual variance portfolio query, including authorised scope, totals, and branch grouping.
+- [x] Add UI component tests for secure receipt preview controls and proposal-to-evidence-form prefilling behavior.
 - [ ] Perform and record authenticated desktop/mobile validation of the new approval workflow, cross-branch variance summary, secure receipt preview, and OPay proposal flow before release.
+- [x] Replace stale dashboard branch-validation guidance now that the authorised KAD-09 branch and selector validation are complete.

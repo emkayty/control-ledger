@@ -10,5 +10,6 @@ describe("live validation guidance", () => {
     const guidance = getLiveValidationGuidance(1, 1);
     expect(guidance.title).toBe("Live evidence validation recorded");
     expect(guidance.message).toContain("variance is visible");
+    expect(guidance.message).toContain("independent approval");
   });
 });

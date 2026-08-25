@@ -1,5 +1,7 @@
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/StatusPill";
+import { OPayProposal, ReceiptPreviewButton, ReceiptProposalCard } from "@/components/ReceiptProposalCard";
+import { evidenceProposalDefaults } from "@/lib/evidenceProposal";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,7 +19,6 @@ import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
   CheckCircle2,
-  Eye,
   FilePlus2,
   FileText,
   FolderUp,
@@ -68,18 +69,6 @@ function QueryFeedback({ loading, message, onRetry }: { loading?: boolean; messa
 
 const makeKey = () => crypto.randomUUID();
 
-type OPayProposal = {
-  provider: "OPay";
-  sourceReference: string | null;
-  amountMinor: string | null;
-  currency: string | null;
-  occurredAtIso: string | null;
-  confidence: "low" | "medium" | "high";
-  notes: string;
-};
-
-const toDateTimeLocal = (value: string | null) => value ? (value.includes("Z") ? new Date(value).toISOString().slice(0, 16) : value.slice(0, 16)) : "";
-
 const readAsBase64 = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -129,7 +118,7 @@ function ReceiptPreviewAndExtract({ file, onUseProposal }: { file: { id: string;
     else toast.error("Secure receipt preview is unavailable.");
   };
   const isImage = isImageReceipt(file.contentType);
-  return <div className="mt-3 flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" onClick={preview} className="h-8 rounded-lg text-xs"><Eye className="mr-1.5 size-3.5" />Preview</Button>{canExtractOpayReceipt(file.contentType) ? <Button type="button" size="sm" variant="outline" disabled={extract.isPending} onClick={() => extract.mutate({ organisationId: scope.organisationId, fileId: file.id, idempotencyKey: makeKey() })} className="h-8 rounded-lg border-violet-200 text-xs text-violet-800 hover:bg-violet-50"><Sparkles className="mr-1.5 size-3.5" />{extract.isPending ? "Reading receipt…" : "Extract OPay fields"}</Button> : null}{latest ? <div className="w-full rounded-xl border border-violet-100 bg-violet-50/60 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-extrabold text-violet-900">OPay proposal · {latest.confidence} confidence</p><Button type="button" size="sm" onClick={() => onUseProposal(latest)} className="h-8 rounded-lg bg-violet-700 text-xs hover:bg-violet-800">Review in evidence form</Button></div><p className="mt-2 text-xs text-violet-950">{latest.amountMinor && latest.currency ? `${formatMoney(latest.amountMinor, latest.currency)} · ` : ""}{latest.sourceReference ?? "No reference read"}</p><p className="mt-1 text-[11px] leading-4 text-violet-800">{latest.notes} Confirm every field before recording; extraction is not proof of settlement.</p></div> : null}<Dialog open={Boolean(previewUrl)} onOpenChange={open => { if (!open) setPreviewUrl(null); }}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Controlled receipt preview</DialogTitle><DialogDescription>{file.originalName}. This preview uses an authorised, time-limited file retrieval link.</DialogDescription></DialogHeader>{previewUrl ? (isImage ? <img src={previewUrl} alt={`Preview of ${file.originalName}`} className="max-h-[70vh] w-full rounded-xl border object-contain" /> : <iframe src={previewUrl} title={`Preview of ${file.originalName}`} className="h-[70vh] w-full rounded-xl border" />) : null}</DialogContent></Dialog></div>;
+  return <div className="mt-3 flex flex-wrap items-center gap-2"><ReceiptPreviewButton onPreview={preview} />{canExtractOpayReceipt(file.contentType) ? <Button type="button" size="sm" variant="outline" disabled={extract.isPending} onClick={() => extract.mutate({ organisationId: scope.organisationId, fileId: file.id, idempotencyKey: makeKey() })} className="h-8 rounded-lg border-violet-200 text-xs text-violet-800 hover:bg-violet-50"><Sparkles className="mr-1.5 size-3.5" />{extract.isPending ? "Reading receipt…" : "Extract OPay fields"}</Button> : null}{latest ? <ReceiptProposalCard proposal={latest} onReview={() => onUseProposal(latest)} /> : null}<Dialog open={Boolean(previewUrl)} onOpenChange={open => { if (!open) setPreviewUrl(null); }}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Controlled receipt preview</DialogTitle><DialogDescription>{file.originalName}. This preview uses an authorised, time-limited file retrieval link.</DialogDescription></DialogHeader>{previewUrl ? (isImage ? <img src={previewUrl} alt={`Preview of ${file.originalName}`} className="max-h-[70vh] w-full rounded-xl border object-contain" /> : <iframe src={previewUrl} title={`Preview of ${file.originalName}`} className="h-[70vh] w-full rounded-xl border" />) : null}</DialogContent></Dialog></div>;
 }
 
 function ReconcileButton({
@@ -334,6 +323,7 @@ function EvidenceRecordDialog({ proposal }: { proposal: OPayProposal | null }) {
   const utils = trpc.useUtils();
   const obligations = trpc.control.obligations.list.useQuery(scope);
   const [open, setOpen] = useState(false);
+  const defaults = evidenceProposalDefaults(proposal);
   useEffect(() => { if (proposal) setOpen(true); }, [proposal]);
   const intake = trpc.control.evidence.intake.useMutation({
     onSuccess: response => {
@@ -372,13 +362,13 @@ function EvidenceRecordDialog({ proposal }: { proposal: OPayProposal | null }) {
             idempotencyKey: makeKey(),
           });
         }}>
-          <select name="kind" className="h-10 rounded-xl border bg-white px-3 text-sm" defaultValue="payment_observation"><option value="payment_observation">Payment observation</option><option value="settlement_evidence">Settlement evidence</option><option value="delivery_observation">Delivery observation</option></select>
+          <select name="kind" className="h-10 rounded-xl border bg-white px-3 text-sm" defaultValue={defaults.kind}><option value="payment_observation">Payment observation</option><option value="settlement_evidence">Settlement evidence</option><option value="delivery_observation">Delivery observation</option></select>
           <select name="obligationId" className="h-10 rounded-xl border bg-white px-3 text-sm" defaultValue=""><option value="">Unlinked evidence</option>{obligations.data?.map(item => <option key={item.id} value={item.id}>{item.reference}</option>)}</select>
-          <Input name="amountMinor" required inputMode="numeric" defaultValue={proposal?.amountMinor ?? ""} placeholder="Exact minor units, e.g. 500000" />
-          <Input name="currency" required defaultValue={proposal?.currency ?? "NGN"} maxLength={3} />
-          <Input name="sourceName" required defaultValue={proposal ? "OPay" : ""} placeholder="Source name, e.g. bank_import" />
-          <Input name="sourceReference" required defaultValue={proposal?.sourceReference ?? ""} placeholder="Stable external reference" />
-          <Input name="occurredAt" type="datetime-local" defaultValue={toDateTimeLocal(proposal?.occurredAtIso ?? null)} />
+          <Input name="amountMinor" required inputMode="numeric" defaultValue={defaults.amountMinor} placeholder="Exact minor units, e.g. 500000" />
+          <Input name="currency" required defaultValue={defaults.currency} maxLength={3} />
+          <Input name="sourceName" required defaultValue={defaults.sourceName} placeholder="Source name, e.g. bank_import" />
+          <Input name="sourceReference" required defaultValue={defaults.sourceReference} placeholder="Stable external reference" />
+          <Input name="occurredAt" type="datetime-local" defaultValue={defaults.occurredAt} />
           <Button disabled={intake.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">Record evidence</Button>
         </form>
       </DialogContent>

@@ -19,18 +19,18 @@ export function getLiveValidationGuidance(recordedEvidence: number, unresolvedEx
   if (recordedEvidence === 0) {
     return {
       title: "Requires authorised live validation",
-      message: "A real evidence record is still needed to exercise the live match and exception path; an authorised branch name and code are still needed to test workspace switching in your operating context.",
+      message: "A real evidence record is still needed to exercise the live match and exception path. Record it with a source reference, then review any resulting variance through the accountable workflow.",
     };
   }
   if (unresolvedExceptions > 0) {
     return {
       title: "Live evidence validation recorded",
-      message: "An independent proof is stored and its variance is visible for accountable review. An authorised branch name and code are still needed to test workspace switching in your operating context.",
+      message: "An independent proof is stored and its variance is visible for accountable review. Investigate it, submit a proposed resolution, and require an independent approval decision before closure.",
     };
   }
   return {
     title: "Live evidence validation recorded",
-    message: "An independent proof is stored and reconciled in the live workflow. An authorised branch name and code are still needed to test workspace switching in your operating context.",
+    message: "An independent proof is stored and reconciled in the live workflow. Continue to monitor the audit trail and resolve only authorised exceptions through the governed approval path.",
   };
 }
 
