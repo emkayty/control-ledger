@@ -28,7 +28,7 @@ describe("controlled evidence-file delivery", () => {
     const result = await appRouter.createCaller(ctx).control.evidence.getFile({ organisationId, fileId });
 
     expect(result).toMatchObject({ id: fileId, originalName: "receipt.webp", contentType: "image/webp", sizeBytes: 53000 });
-    expect(result.url).toMatch(/^\/manus-storage\/grant\/[A-Za-z0-9_-]{40,}$/);
+    expect(result.url).toMatch(/^\/api\/control-files\/grant\/[A-Za-z0-9_-]{40,}$/);
     expect(result).not.toHaveProperty("storageKey");
     expect(result).not.toHaveProperty("storageUrl");
     expect(inserted[0]).toMatchObject({ organisationId, branchId, evidenceFileId: fileId, userId: 1 });

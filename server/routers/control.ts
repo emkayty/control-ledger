@@ -622,7 +622,7 @@ export const controlRouter = router({
         originalName: file[0].originalName,
         contentType: file[0].contentType,
         sizeBytes: file[0].sizeBytes,
-        url: `/manus-storage/grant/${grant.token}`,
+        url: `/api/control-files/grant/${grant.token}`,
       };
     }),
   }),

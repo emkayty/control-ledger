@@ -8,7 +8,7 @@ import { sdk } from "./sdk";
 import { hashFileAccessToken } from "../control/fileAccess";
 
 export function registerStorageProxy(app: Express) {
-  app.get("/manus-storage/grant/:token", async (req, res) => {
+  app.get("/api/control-files/grant/:token", async (req, res) => {
     const user = await sdk.authenticateRequest(req).catch(() => null);
     if (!user) {
       res.status(401).send("Authentication is required for controlled file access.");

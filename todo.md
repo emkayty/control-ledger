@@ -67,3 +67,4 @@
 - [ ] Define and surface receipt-extraction data-governance controls, including authorised-use notice, retention/processing policy, and an organisation-level enablement choice.
 - [ ] Complete real-device signed-in production acceptance checks for the enhanced dashboard, evidence, exception, and audit flows without submitting a resolution or changing evidence.
 - [ ] Replace the unauthenticated managed-storage redirect with an authenticated, tenant- and branch-scoped receipt-delivery route so possession or discovery of a storage key cannot bypass file access controls.
+- [ ] Address legacy raw managed-storage URLs already exposed by the hosting-layer storage endpoint; newly issued controlled previews now use the application’s authenticated API route, but old object URLs require platform-level revocation or object rotation.

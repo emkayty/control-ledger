@@ -21,3 +21,15 @@ The live unmatched-record exception remained **open** with an NGN 29,997.78 valu
 ## 25 August 2026 — signed-in desktop audit trail
 
 The scoped immutable audit trail included **evidence · receipt extraction proposed** with correlation ID `6bec859a-ba64-4ae7-9fc8-efe626f52487`, alongside the preceding association correction, reconciliation, evidence-file, and evidence-event records. This confirms that the extraction proposal was added as an auditable event and did not replace prior source or reconciliation history.
+
+## 25 August 2026 — post-remediation production evidence page
+
+Following the security-remediation deployment, the signed-in Main branch evidence page loaded the existing OPay observation, the unchanged high-confidence proposal, and the controlled **Preview** action. No extraction, evidence recording, reconciliation, exception submission, approval, or resolution action was performed.
+
+The authorised preview still rendered successfully. The page’s exposed image path appeared to reflect a pre-deployment raw managed-storage URL in the existing browser session, so the session must be reloaded and the authenticated grant URL verified before the storage remediation is accepted as complete.
+
+The production evidence page was then fully reloaded under the owner session. It retained the expected existing evidence and proposal controls, ready for a fresh preview request. No business record was changed.
+
+A fresh production `control.evidence.getFile` response during the initial propagation window still contained the prior raw storage metadata and raw path. Therefore, the scoped-delivery security remediation is **not yet accepted** in production and must be rechecked once the new deployment is definitively active.
+
+The page was also reloaded with a cache-busting query parameter and continued to display the unchanged evidence and proposal UI. The backend delivery shape still requires direct verification.
