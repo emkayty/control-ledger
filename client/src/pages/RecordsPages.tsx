@@ -1,6 +1,7 @@
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/StatusPill";
 import { OPayProposal, ReceiptPreviewButton, ReceiptProposalCard } from "@/components/ReceiptProposalCard";
+import { ReceiptExtractionPolicyCard } from "@/components/ReceiptExtractionPolicyCard";
 import { evidenceProposalDefaults } from "@/lib/evidenceProposal";
 import { Button } from "@/components/ui/button";
 import {
@@ -102,8 +103,20 @@ function ReceiptPreviewAndExtract({ file, onUseProposal }: { file: { id: string;
   const scope = useControlScope();
   const utils = trpc.useUtils();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const [processingAccepted, setProcessingAccepted] = useState(false);
   const fileQuery = trpc.control.evidence.getFile.useQuery({ organisationId: scope.organisationId, fileId: file.id }, { enabled: false });
   const proposals = trpc.control.evidence.extractionProposals.useQuery({ organisationId: scope.organisationId, fileId: file.id });
+  const policy = trpc.control.receiptExtractionPolicy.get.useQuery({ organisationId: scope.organisationId });
+  const configurePolicy = trpc.control.receiptExtractionPolicy.configure.useMutation({
+    onSuccess: () => {
+      toast.success("Receipt extraction is enabled for this organisation. Every proposal still requires human review.");
+      setPolicyOpen(false);
+      setProcessingAccepted(false);
+      policy.refetch();
+    },
+    onError: error => toast.error(error.message),
+  });
   const extract = trpc.control.evidence.extractOpayReceipt.useMutation({
     onSuccess: () => {
       toast.success("OPay fields were proposed for review; no evidence was created or changed.");
@@ -118,7 +131,10 @@ function ReceiptPreviewAndExtract({ file, onUseProposal }: { file: { id: string;
     else toast.error("Secure receipt preview is unavailable.");
   };
   const isImage = isImageReceipt(file.contentType);
-  return <div className="mt-3 flex flex-wrap items-center gap-2"><ReceiptPreviewButton onPreview={preview} />{canExtractOpayReceipt(file.contentType) ? <Button type="button" size="sm" variant="outline" disabled={extract.isPending} onClick={() => extract.mutate({ organisationId: scope.organisationId, fileId: file.id, idempotencyKey: makeKey() })} className="h-8 rounded-lg border-violet-200 text-xs text-violet-800 hover:bg-violet-50"><Sparkles className="mr-1.5 size-3.5" />{extract.isPending ? "Reading receipt…" : "Extract OPay fields"}</Button> : null}{latest ? <ReceiptProposalCard proposal={latest} onReview={() => onUseProposal(latest)} /> : null}<Dialog open={Boolean(previewUrl)} onOpenChange={open => { if (!open) setPreviewUrl(null); }}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Controlled receipt preview</DialogTitle><DialogDescription>{file.originalName}. This preview uses an authorised, time-limited file retrieval link.</DialogDescription></DialogHeader>{previewUrl ? (isImage ? <img src={previewUrl} alt={`Preview of ${file.originalName}`} className="max-h-[70vh] w-full rounded-xl border object-contain" /> : <iframe src={previewUrl} title={`Preview of ${file.originalName}`} className="h-[70vh] w-full rounded-xl border" />) : null}</DialogContent></Dialog></div>;
+  const canExtract = canExtractOpayReceipt(file.contentType);
+  const extractionEnabled = policy.data?.enabled === true;
+  const acceptanceDetail = policy.data?.acceptedAt ? `${new Date(policy.data.acceptedAt).toLocaleString()}${policy.data.acceptedBy ? ` by ${policy.data.acceptedBy}` : ""}` : "No owner acceptance recorded.";
+  return <div className="mt-3 flex flex-wrap items-center gap-2"><ReceiptPreviewButton onPreview={preview} />{canExtract && extractionEnabled ? <Button type="button" size="sm" variant="outline" disabled={extract.isPending} onClick={() => extract.mutate({ organisationId: scope.organisationId, fileId: file.id, idempotencyKey: makeKey() })} className="h-8 rounded-lg border-violet-200 text-xs text-violet-800 hover:bg-violet-50"><Sparkles className="mr-1.5 size-3.5" />{extract.isPending ? "Reading receipt…" : "Extract OPay fields"}</Button> : null}{canExtract ? <ReceiptExtractionPolicyCard enabled={extractionEnabled} acceptedAt={policy.data?.acceptedAt} acceptedBy={policy.data?.acceptedBy} isOwner={scope.role === "owner"} onManage={() => setPolicyOpen(true)} /> : null}{latest ? <ReceiptProposalCard proposal={latest} onReview={() => onUseProposal(latest)} /> : null}<Dialog open={policyOpen} onOpenChange={setPolicyOpen}><DialogContent><DialogHeader><DialogTitle>{extractionEnabled ? "Manage OPay receipt extraction" : "Enable OPay receipt extraction"}</DialogTitle><DialogDescription>This feature sends an authorised receipt image to the configured extraction processor to create a human-reviewed proposal. It does not record evidence, reconcile a payment, approve a variance, or confirm settlement. The extraction flow stores no raw image bytes in the control database; the original evidence file, proposal, and audit record remain under your organisation’s evidence-retention responsibility.</DialogDescription></DialogHeader>{extractionEnabled ? <><p className="rounded-xl border bg-emerald-50 p-3 text-sm leading-5 text-emerald-950">Currently enabled. Policy acceptance: {acceptanceDetail}</p><Button variant="outline" disabled={configurePolicy.isPending} onClick={() => configurePolicy.mutate({ organisationId: scope.organisationId, enabled: false, acceptProcessingNotice: false })} className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50">{configurePolicy.isPending ? "Updating…" : "Disable controlled extraction"}</Button></> : <><label className="flex gap-3 rounded-xl border bg-amber-50 p-3 text-sm leading-5 text-amber-950"><input type="checkbox" checked={processingAccepted} onChange={event => setProcessingAccepted(event.target.checked)} className="mt-1 size-4" /><span>I confirm that my organisation is authorised to process this receipt data with the configured extraction processor, understands the stated retention boundary, and will review every proposal before recording it.</span></label><Button disabled={!processingAccepted || configurePolicy.isPending} onClick={() => configurePolicy.mutate({ organisationId: scope.organisationId, enabled: true, acceptProcessingNotice: true })} className="rounded-xl bg-teal-700 hover:bg-teal-800">{configurePolicy.isPending ? "Enabling…" : "Enable controlled extraction"}</Button></>}</DialogContent></Dialog><Dialog open={Boolean(previewUrl)} onOpenChange={open => { if (!open) setPreviewUrl(null); }}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Controlled receipt preview</DialogTitle><DialogDescription>{file.originalName}. This preview uses an authorised, time-limited file retrieval link.</DialogDescription></DialogHeader>{previewUrl ? (isImage ? <img src={previewUrl} alt={`Preview of ${file.originalName}`} className="max-h-[70vh] w-full rounded-xl border object-contain" /> : <iframe src={previewUrl} title={`Preview of ${file.originalName}`} className="h-[70vh] w-full rounded-xl border" />) : null}</DialogContent></Dialog></div>;
 }
 
 function ReconcileButton({

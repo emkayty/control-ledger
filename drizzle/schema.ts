@@ -28,6 +28,9 @@ export const organisations = mysqlTable("organisations", {
   name: varchar("name", { length: 160 }).notNull(),
   legalName: varchar("legalName", { length: 180 }),
   baseCurrency: varchar("baseCurrency", { length: 3 }).notNull().default("NGN"),
+  receiptExtractionEnabled: int("receiptExtractionEnabled").notNull().default(0),
+  receiptExtractionPolicyAcceptedAt: timestamp("receiptExtractionPolicyAcceptedAt"),
+  receiptExtractionPolicyAcceptedByUserId: int("receiptExtractionPolicyAcceptedByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   createdByUserId: int("createdByUserId").notNull(),
 });

@@ -64,7 +64,10 @@
 - [x] Strengthen approval independence by preventing the user who submitted a resolution from approving that same submission, even when they did not create the original exception.
 - [ ] Make material control-state mutations and their corresponding audit-event inserts atomic within one transaction, with failure tests for audit-write rollback.
 - [x] Add race-safe approval finalisation so concurrent approvers cannot append competing decisions after one resolution has already changed state.
-- [ ] Define and surface receipt-extraction data-governance controls, including authorised-use notice, retention/processing policy, and an organisation-level enablement choice.
+- [x] Define and surface receipt-extraction data-governance controls, including authorised-use notice, retention/processing policy, and an organisation-level enablement choice.
+- [x] Add a visible organisation-level receipt-extraction settings surface that shows enabled/disabled state, accepted-at/by details, and lets an owner disable the feature after enabling it.
+- [x] Expand the in-product receipt-extraction policy with specific processing scope, proposal/audit retention boundary, and operator-facing authorised-use guidance.
+- [x] Add targeted router and UI coverage for receipt-extraction policy enable, disable, owner restriction, and fail-closed extraction behavior.
 - [ ] Complete real-device signed-in production acceptance checks for the enhanced dashboard, evidence, exception, and audit flows without submitting a resolution or changing evidence.
 - [ ] Replace the unauthenticated managed-storage redirect with an authenticated, tenant- and branch-scoped receipt-delivery route so possession or discovery of a storage key cannot bypass file access controls.
 - [ ] Address legacy raw managed-storage URLs already exposed by the hosting-layer storage endpoint; newly issued controlled previews now use the application’s authenticated API route, but old object URLs require platform-level revocation or object rotation.

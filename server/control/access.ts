@@ -14,6 +14,7 @@ export const permissions = {
   resolve: ["owner", "controller", "manager"],
   approve: ["owner", "controller", "approver"],
   manageMemberships: ["owner", "controller"],
+  manageReceiptExtraction: ["owner"],
 } as const;
 
 export function canPerform(role: ControlRole, action: keyof typeof permissions) {

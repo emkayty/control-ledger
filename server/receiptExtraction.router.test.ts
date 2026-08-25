@@ -39,6 +39,7 @@ describe("protected OPay receipt extraction", () => {
 
   it("stores only an append-only human-review proposal for an authorised receipt image", async () => {
     const { db, inserted } = database([
+      [{ enabled: 1, acceptedAt: new Date() }],
       [{ id: fileId, organisationId, branchId, contentType: "image/webp", sizeBytes: 500, storageKey: "receipt.webp" }],
       [{ id: "member", organisationId, branchId, userId: 1, role: "owner", isActive: 1 }],
       [],
@@ -54,12 +55,22 @@ describe("protected OPay receipt extraction", () => {
 
   it("rejects non-image files before calling the vision service", async () => {
     const { db } = database([
+      [{ enabled: 1, acceptedAt: new Date() }],
       [{ id: fileId, organisationId, branchId, contentType: "application/pdf", sizeBytes: 500, storageKey: "receipt.pdf" }],
       [{ id: "member", organisationId, branchId, userId: 1, role: "owner", isActive: 1 }],
     ]);
     getDbMock.mockResolvedValue(db);
 
     await expect(appRouter.createCaller(context()).control.evidence.extractOpayReceipt({ organisationId, fileId, idempotencyKey: "receipt-extraction-pdf-1" })).rejects.toThrow("image receipts only");
+    expect(invokeLLMMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before file retrieval or model invocation when the owner has not enabled processing", async () => {
+    const { db } = database([[{ enabled: 0, acceptedAt: null }]]);
+    getDbMock.mockResolvedValue(db);
+
+    await expect(appRouter.createCaller(context()).control.evidence.extractOpayReceipt({ organisationId, fileId, idempotencyKey: "receipt-extraction-disabled-1" })).rejects.toThrow("Receipt extraction is disabled");
+    expect(storageGetSignedUrlMock).not.toHaveBeenCalled();
     expect(invokeLLMMock).not.toHaveBeenCalled();
   });
 });

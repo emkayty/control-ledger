@@ -427,6 +427,29 @@ export const controlRouter = router({
       }),
   }),
 
+  receiptExtractionPolicy: router({
+    get: protectedProcedure.input(z.object({ organisationId: z.string().uuid() })).query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, allowed: permissions.read });
+      const [organisation] = await db.select({ enabled: organisations.receiptExtractionEnabled, acceptedAt: organisations.receiptExtractionPolicyAcceptedAt, acceptedByUserId: organisations.receiptExtractionPolicyAcceptedByUserId }).from(organisations).where(eq(organisations.id, input.organisationId)).limit(1);
+      if (!organisation) throw new TRPCError({ code: "NOT_FOUND", message: "Organisation not found." });
+      const [acceptedBy] = organisation.acceptedByUserId ? await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, organisation.acceptedByUserId)).limit(1) : [];
+      return { enabled: organisation.enabled === 1, acceptedAt: organisation.acceptedAt, acceptedBy: acceptedBy?.name ?? acceptedBy?.email ?? null };
+    }),
+    configure: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), enabled: z.boolean(), acceptProcessingNotice: z.boolean() })).mutation(async ({ ctx, input }) => {
+      if (input.enabled && !input.acceptProcessingNotice) throw new TRPCError({ code: "BAD_REQUEST", message: "The processing notice must be accepted before receipt extraction can be enabled." });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, allowed: permissions.manageReceiptExtraction });
+      const correlationId = correlation();
+      await db.transaction(async tx => {
+        await tx.update(organisations).set({ receiptExtractionEnabled: input.enabled ? 1 : 0, receiptExtractionPolicyAcceptedAt: input.enabled ? new Date() : null, receiptExtractionPolicyAcceptedByUserId: input.enabled ? ctx.user.id : null }).where(eq(organisations.id, input.organisationId));
+        await tx.insert(auditEvents).values({ id: recordId(), organisationId: input.organisationId, actorUserId: ctx.user.id, action: "organisation.receipt_extraction_policy_configured", entityType: "organisation", entityId: input.organisationId, correlationId, metadata: { enabled: input.enabled, processingNoticeAccepted: input.enabled } });
+      });
+      return { enabled: input.enabled, correlationId };
+    }),
+  }),
   evidence: router({
     list: protectedProcedure.input(controlScope).query(async ({ ctx, input }) => {
       const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.read });
@@ -532,6 +555,9 @@ export const controlRouter = router({
     extractOpayReceipt: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), fileId: z.string().uuid(), idempotencyKey: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const [policy] = await db.select({ enabled: organisations.receiptExtractionEnabled, acceptedAt: organisations.receiptExtractionPolicyAcceptedAt }).from(organisations).where(eq(organisations.id, input.organisationId)).limit(1);
+      if (!policy) throw new TRPCError({ code: "NOT_FOUND", message: "Organisation not found." });
+      if (policy.enabled !== 1 || !policy.acceptedAt) throw new TRPCError({ code: "FORBIDDEN", message: "Receipt extraction is disabled until an organisation owner accepts the processing notice and enables it." });
       const [file] = await db.select().from(evidenceFiles).where(and(eq(evidenceFiles.id, input.fileId), eq(evidenceFiles.organisationId, input.organisationId))).limit(1);
       if (!file) throw new TRPCError({ code: "NOT_FOUND", message: "Receipt file not found." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: file.branchId, allowed: permissions.recordEvidence });

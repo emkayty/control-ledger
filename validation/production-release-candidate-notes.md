@@ -35,3 +35,11 @@ A fresh production `control.evidence.getFile` response during the initial propag
 The page was also reloaded with a cache-busting query parameter and continued to display the unchanged evidence and proposal UI. The backend delivery shape still requires direct verification.
 
 After the API-route correction checkpoint, the production evidence page again loaded cleanly in the signed-in Main branch workspace with the original evidence and proposal unchanged. A fresh backend-response check follows.
+
+After the protected signed-URL checkpoint, the production Main branch evidence page again loaded cleanly with the existing OPay evidence, preview control, and human-review proposal. No financial or approval action was taken.
+
+## 25 August 2026 — development visual verification of processing governance
+
+Desktop and narrow-mobile previews of the current development build showed the new fail-closed state clearly: **“OPay extraction is disabled for this organisation”**, an owner-facing **“Review processing notice”** action, and the existing proposal-review button. The notice states that extraction creates an editable proposal only and does not create evidence, reconcile value, or prove settlement. The evidence card and actions remained readable and reachable at 375px width.
+
+The final policy-management rendering adds specific processing scope and retention-boundary language: only an authorised receipt image is sent to the configured processor; the control database retains proposal and audit metadata rather than raw image bytes; and the organisation remains responsible for evidence retention and authorised use. The complete card remains readable without horizontal clipping at 375px width.

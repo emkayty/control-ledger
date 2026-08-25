@@ -4,7 +4,7 @@ const { getDbMock } = vi.hoisted(() => ({ getDbMock: vi.fn() }));
 
 vi.mock("../db", () => ({ getDb: getDbMock }));
 
-import { requireScopedMembership } from "./access";
+import { canPerform, requireScopedMembership } from "./access";
 
 function databaseReturning(rows: unknown[]) {
   return {
@@ -34,5 +34,11 @@ describe("tenant-scoped protected access", () => {
   it("fails closed when no active in-scope membership is returned", async () => {
     getDbMock.mockResolvedValue(databaseReturning([]));
     await expect(requireScopedMembership({ userId: 9, organisationId: "org-a", branchId: "branch-a", allowed: ["owner"] })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("reserves receipt-extraction policy management for an organisation owner", () => {
+    expect(canPerform("owner", "manageReceiptExtraction")).toBe(true);
+    expect(canPerform("controller", "manageReceiptExtraction")).toBe(false);
+    expect(canPerform("operator", "manageReceiptExtraction")).toBe(false);
   });
 });
