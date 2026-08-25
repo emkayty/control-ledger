@@ -35,15 +35,24 @@
 - [x] Add a tRPC integration-style test for authenticated protected workspace access and scoped response shaping without writing artificial business records.
 - [x] Add isolated protected-scope procedure tests that verify allowed roles and fail-closed unauthorised membership outcomes without inserting operational test data.
 - [ ] Conduct authenticated dashboard, receivables, evidence, reconciliation, and exceptions smoke tests using user-owned workspace data on desktop and mobile; then inspect runtime logs.
-- [ ] Review the user-created workspace records and report whether the implemented Release 1 controls operate as intended.
+- [ ] Capture authenticated desktop and mobile verification of the real receivable, live reconciliation state, evidence, exception, and audit views before final release sign-off.
+- [x] Review the user-created workspace records and report whether the implemented Release 1 controls operate as intended.
 - [x] Add owner/controller-governed membership management for existing users, including organisation-wide and branch-scoped role assignment, revocation, and access visibility.
 - [x] Add owner-governed branch creation and branch visibility so an organisation can operate multiple independently scoped branches.
 - [x] Make branch creation replay-safe by applying idempotency validation before duplicate-code conflict handling.
 - [x] Verify the branch-create idempotency adjustment with safe-replay and distinct-request duplicate-code tests.
 - [x] Add automated tests for owner-only branch creation, branch-code uniqueness, and organisation-wide versus branch-scoped visibility.
-- [ ] Perform an authorised end-to-end branch creation and workspace-selector validation without inventing operational financial records.
+- [x] Perform an authorised end-to-end branch creation and workspace-selector validation without inventing operational financial records.
+- [x] Confirm in the signed-in interface that the real KAD-09 branch appears in the workspace selector and renders its isolated empty control position.
 - [x] Hide the revoke action for the signed-in user to match the self-revocation protection enforced by the access API.
 - [x] Replace the horizontally clipped mobile receivables table with a compact card presentation while retaining the desktop table.
 - [x] Produce the Release 1 readiness summary.
 - [x] Add and verify a concise role-aware acceptance checklist that guides controlled validation of cash, bank-transfer, and delivery-proof workflows.
 - [ ] Create the final project checkpoint and provide the project version to the user.
+- [x] Add an append-only variance approval workflow with investigation, submit-for-approval, approve/reject, and audited resolution decisions.
+- [x] Add owner/controller cross-branch dashboard visibility for open variance count and value while preserving branch-scoped operational detail.
+- [x] Add controlled receipt image previews that use authorised managed-file retrieval rather than public file access.
+- [x] Add OPay-focused receipt extraction that proposes fields for human confirmation without overwriting user-entered evidence or treating extraction as settlement confirmation.
+- [ ] Add automated coverage and signed-in desktop/mobile validation for approval, cross-branch variance, preview, and extraction workflows.
+- [ ] Add targeted automated coverage for the variance portfolio query, controlled OPay extraction success/failure paths, and preview/proposal UI behavior.
+- [ ] Perform and record authenticated desktop/mobile validation of the new approval workflow, cross-branch variance summary, secure receipt preview, and OPay proposal flow before release.

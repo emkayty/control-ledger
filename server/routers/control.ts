@@ -10,12 +10,14 @@ import {
   evidenceAssociationCorrections,
   evidenceEvents,
   evidenceFiles,
+  exceptionApprovalDecisions,
   exceptionNotes,
   idempotencyKeys,
   integrationIntakeRecords,
   organisationMemberships,
   organisations,
   receivableObligations,
+  receiptExtractionProposals,
   reconciliationLinks,
   users,
 } from "../../drizzle/schema";
@@ -24,8 +26,12 @@ import { assertEvidenceFileInput, assertEvidenceLinkScope } from "../control/fil
 import { latestEvidenceAssociation } from "../control/evidenceAssociation";
 import { assertMinorAmount, assertPositiveMinorAmount, isPositiveMinorAmount } from "../control/money";
 import { calculateAvailableAllocation, determineReconciliation } from "../control/reconciliation";
+import { parseReceiptProposalResponse } from "../control/receiptExtraction";
+import { nextExceptionStatus } from "../control/varianceApproval";
+import { summariseVariancePortfolio } from "../control/variancePortfolio";
 import { getDb } from "../db";
-import { storageGet, storagePut } from "../storage";
+import { storageGet, storageGetSignedUrl, storagePut } from "../storage";
+import { invokeLLM, listLLMModels } from "../_core/llm";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const controlScope = z.object({ organisationId: z.string().uuid(), branchId: z.string().uuid() });
@@ -341,6 +347,22 @@ export const controlRouter = router({
     };
   }),
 
+  variancePortfolio: protectedProcedure.input(z.object({ organisationId: z.string().uuid() })).query(async ({ ctx, input }) => {
+    const membership = await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, allowed: ["owner", "controller"] });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+    const visibleBranchId = membership.branchId ?? undefined;
+    const [exceptionRows, branchRows] = await Promise.all([
+      db.select().from(controlExceptions).where(and(eq(controlExceptions.organisationId, input.organisationId), visibleBranchId ? eq(controlExceptions.branchId, visibleBranchId) : undefined)),
+      db.select({ id: branches.id, name: branches.name, code: branches.code }).from(branches).where(and(eq(branches.organisationId, input.organisationId), eq(branches.isActive, 1))),
+    ]);
+    const summary = summariseVariancePortfolio(exceptionRows, branchRows);
+    return {
+      visibility: visibleBranchId ? "branch" as const : "organisation" as const,
+      ...summary,
+    };
+  }),
+
   customers: router({
     list: protectedProcedure.input(controlScope).query(async ({ ctx, input }) => {
       const db = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.read });
@@ -507,6 +529,56 @@ export const controlRouter = router({
       }).from(evidenceFiles).where(and(eq(evidenceFiles.organisationId, input.organisationId), eq(evidenceFiles.branchId, input.branchId)));
       return input.evidenceEventId ? rows.filter(row => row.evidenceEventId === input.evidenceEventId) : rows;
     }),
+    extractOpayReceipt: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), fileId: z.string().uuid(), idempotencyKey: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const [file] = await db.select().from(evidenceFiles).where(and(eq(evidenceFiles.id, input.fileId), eq(evidenceFiles.organisationId, input.organisationId))).limit(1);
+      if (!file) throw new TRPCError({ code: "NOT_FOUND", message: "Receipt file not found." });
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: file.branchId, allowed: permissions.recordEvidence });
+      if (!file.contentType.startsWith("image/")) throw new TRPCError({ code: "BAD_REQUEST", message: "OPay extraction supports image receipts only. Upload a receipt image rather than a PDF." });
+      return getOrCreateIdempotent({
+        organisationId: input.organisationId,
+        userId: ctx.user.id,
+        action: "evidence.extract_opay_receipt",
+        idempotencyKey: input.idempotencyKey,
+        request: { fileId: input.fileId },
+        execute: async () => {
+          const models = await listLLMModels();
+          const model = models.data.some(item => item.id === "gpt-5-mini") ? "gpt-5-mini" : models.data.some(item => item.id === "gemini-3-flash-preview") ? "gemini-3-flash-preview" : models.data[0]?.id;
+          if (!model) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No receipt-extraction model is currently available." });
+          if (file.sizeBytes > 6_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "This receipt image is too large for controlled extraction. Use an image under 6 MB or review it manually." });
+          const signedUrl = await storageGetSignedUrl(file.storageKey);
+          const receiptResponse = await fetch(signedUrl);
+          if (!receiptResponse.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: "The authorised receipt bytes could not be retrieved for extraction." });
+          const receiptBase64 = Buffer.from(await receiptResponse.arrayBuffer()).toString("base64");
+          const imageUrl = `data:${file.contentType};base64,${receiptBase64}`;
+          const extraction = await invokeLLM({
+            model,
+            messages: [{ role: "system", content: "You extract fields from OPay payment receipt images. Read only visible text. Never infer missing values. Return a proposal for human confirmation, not proof of payment or settlement." }, { role: "user", content: [{ type: "text", text: "Extract the OPay receipt reference, amount in exact minor units, ISO 4217 currency, occurred timestamp in ISO 8601 if fully visible (otherwise null), confidence, and a brief note. The receipt amount in NGN must be multiplied by 100 to create minor units. If a field is unclear, use null and lower confidence." }, { type: "image_url", image_url: { url: imageUrl, detail: "high" } }] }],
+            outputSchema: { name: "opay_receipt_proposal", strict: true, schema: { type: "object", properties: { provider: { type: "string", const: "OPay" }, sourceReference: { type: ["string", "null"] }, amountMinor: { type: ["string", "null"] }, currency: { type: ["string", "null"] }, occurredAtIso: { type: ["string", "null"] }, confidence: { type: "string", enum: ["low", "medium", "high"] }, notes: { type: "string" } }, required: ["provider", "sourceReference", "amountMinor", "currency", "occurredAtIso", "confidence", "notes"], additionalProperties: false } },
+          });
+          const result = (extraction as typeof extraction & { data?: typeof extraction }).data ?? extraction;
+          let proposal;
+          try {
+            proposal = parseReceiptProposalResponse(result.choices?.[0]?.message.content);
+          } catch {
+            throw new TRPCError({ code: "BAD_GATEWAY", message: "Receipt extraction did not return a structured proposal. Please review the receipt manually." });
+          }
+          const entityId = recordId(); const correlationId = correlation();
+          await db.insert(receiptExtractionProposals).values({ id: entityId, organisationId: input.organisationId, branchId: file.branchId, evidenceFileId: file.id, provider: proposal.provider, confidence: proposal.confidence, proposal, correlationId, createdByUserId: ctx.user.id });
+          await writeAudit({ organisationId: input.organisationId, branchId: file.branchId, actorUserId: ctx.user.id, action: "evidence.receipt_extraction_proposed", entityType: "receipt_extraction_proposal", entityId, correlationId, metadata: { evidenceFileId: file.id, provider: proposal.provider, confidence: proposal.confidence } });
+          return { entityId, correlationId };
+        },
+      });
+    }),
+    extractionProposals: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), fileId: z.string().uuid() })).query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const [file] = await db.select({ branchId: evidenceFiles.branchId }).from(evidenceFiles).where(and(eq(evidenceFiles.id, input.fileId), eq(evidenceFiles.organisationId, input.organisationId))).limit(1);
+      if (!file) throw new TRPCError({ code: "NOT_FOUND", message: "Receipt file not found." });
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: file.branchId, allowed: permissions.read });
+      return db.select({ id: receiptExtractionProposals.id, provider: receiptExtractionProposals.provider, confidence: receiptExtractionProposals.confidence, proposal: receiptExtractionProposals.proposal, createdAt: receiptExtractionProposals.createdAt, correlationId: receiptExtractionProposals.correlationId }).from(receiptExtractionProposals).where(and(eq(receiptExtractionProposals.organisationId, input.organisationId), eq(receiptExtractionProposals.evidenceFileId, input.fileId))).orderBy(desc(receiptExtractionProposals.createdAt));
+    }),
     uploadFile: protectedProcedure.input(uploadInput).mutation(async ({ ctx, input }) => {
       const scopedDb = await requireExistingScope({ ...input, userId: ctx.user.id, allowed: permissions.recordEvidence });
       const fileBytes = Buffer.from(input.contentBase64.replace(/^data:.*;base64,/, ""), "base64");
@@ -610,20 +682,32 @@ export const controlRouter = router({
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.resolve });
       const id = recordId(); const correlationId = correlation();
       await db.insert(exceptionNotes).values({ id, exceptionId: exception.id, organisationId: input.organisationId, body: input.body, createdByUserId: ctx.user.id, correlationId });
+      if (exception.status === "open") await db.update(controlExceptions).set({ status: "investigating" }).where(eq(controlExceptions.id, exception.id));
       await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.note_added", entityType: "control_exception", entityId: exception.id, correlationId });
       return { id };
+    }),
+    approvalHistory: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid() })).query(async ({ ctx, input }) => {
+      const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const [exception] = await db.select({ branchId: controlExceptions.branchId }).from(controlExceptions).where(and(eq(controlExceptions.id, input.exceptionId), eq(controlExceptions.organisationId, input.organisationId))).limit(1);
+      if (!exception) throw new TRPCError({ code: "NOT_FOUND", message: "Exception not found." });
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.read });
+      return db.select({ id: exceptionApprovalDecisions.id, decision: exceptionApprovalDecisions.decision, rationale: exceptionApprovalDecisions.rationale, createdAt: exceptionApprovalDecisions.createdAt, correlationId: exceptionApprovalDecisions.correlationId, actorName: users.name }).from(exceptionApprovalDecisions).leftJoin(users, eq(users.id, exceptionApprovalDecisions.createdByUserId)).where(and(eq(exceptionApprovalDecisions.organisationId, input.organisationId), eq(exceptionApprovalDecisions.exceptionId, input.exceptionId))).orderBy(desc(exceptionApprovalDecisions.createdAt));
     }),
     submitResolution: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid(), note: z.string().min(4).max(4000) })).mutation(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
       const [exception] = await db.select().from(controlExceptions).where(and(eq(controlExceptions.id, input.exceptionId), eq(controlExceptions.organisationId, input.organisationId))).limit(1);
       if (!exception) throw new TRPCError({ code: "NOT_FOUND", message: "Exception not found." });
+      if (["resolved", "rejected"].includes(exception.status)) throw new TRPCError({ code: "CONFLICT", message: "A closed exception cannot be resubmitted." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.resolve });
       const correlationId = correlation();
-      await db.update(controlExceptions).set({ status: exception.approvalRequired ? "pending_approval" : "resolved", resolutionNote: input.note, resolvedAt: exception.approvalRequired ? null : new Date(), resolvedByUserId: exception.approvalRequired ? null : ctx.user.id }).where(eq(controlExceptions.id, exception.id));
-      await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: exception.approvalRequired ? "exception.resolution_submitted" : "exception.resolved", entityType: "control_exception", entityId: exception.id, correlationId, metadata: { approvalRequired: Boolean(exception.approvalRequired) } });
-      return { status: exception.approvalRequired ? "pending_approval" : "resolved" };
+      await db.transaction(async tx => {
+        await tx.update(controlExceptions).set({ status: nextExceptionStatus("submitted"), approvalRequired: 1, resolutionNote: input.note, resolvedAt: null, resolvedByUserId: null }).where(eq(controlExceptions.id, exception.id));
+        await tx.insert(exceptionApprovalDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: exception.branchId, exceptionId: exception.id, decision: "submitted", rationale: input.note, correlationId, createdByUserId: ctx.user.id });
+      });
+      await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.resolution_submitted", entityType: "control_exception", entityId: exception.id, correlationId, metadata: { approvalRequired: true } });
+      return { status: "pending_approval" as const };
     }),
-    approveResolution: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid(), approve: z.boolean() })).mutation(async ({ ctx, input }) => {
+    approveResolution: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid(), approve: z.boolean(), rationale: z.string().min(4).max(4000) })).mutation(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
       const [exception] = await db.select().from(controlExceptions).where(and(eq(controlExceptions.id, input.exceptionId), eq(controlExceptions.organisationId, input.organisationId))).limit(1);
       if (!exception) throw new TRPCError({ code: "NOT_FOUND", message: "Exception not found." });
@@ -631,8 +715,12 @@ export const controlRouter = router({
       if (exception.createdByUserId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "The exception initiator cannot approve its own resolution." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.approve });
       const correlationId = correlation();
-      await db.update(controlExceptions).set({ status: input.approve ? "resolved" : "investigating", resolvedAt: input.approve ? new Date() : null, resolvedByUserId: input.approve ? ctx.user.id : null }).where(eq(controlExceptions.id, exception.id));
-      await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: input.approve ? "exception.approved" : "exception.returned", entityType: "control_exception", entityId: exception.id, correlationId });
+      const decision = input.approve ? "approved" as const : "returned" as const;
+      await db.transaction(async tx => {
+        await tx.update(controlExceptions).set({ status: nextExceptionStatus(decision), resolvedAt: input.approve ? new Date() : null, resolvedByUserId: input.approve ? ctx.user.id : null }).where(eq(controlExceptions.id, exception.id));
+        await tx.insert(exceptionApprovalDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: exception.branchId, exceptionId: exception.id, decision, rationale: input.rationale, correlationId, createdByUserId: ctx.user.id });
+      });
+      await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: input.approve ? "exception.approved" : "exception.returned", entityType: "control_exception", entityId: exception.id, correlationId, metadata: { rationale: input.rationale } });
       return { status: input.approve ? "resolved" : "investigating" };
     }),
   }),

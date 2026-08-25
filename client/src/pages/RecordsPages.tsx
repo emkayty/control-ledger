@@ -12,20 +12,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { useControlScope } from "@/contexts/ControlScopeContext";
 import { formatMoney } from "@/lib/control";
+import { canExtractOpayReceipt, isImageReceipt } from "@/lib/receiptView";
 import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
   CheckCircle2,
+  Eye,
   FilePlus2,
   FileText,
   FolderUp,
+  History,
+  Image,
   Link2,
   ReceiptText,
   ShieldCheck,
+  Sparkles,
   UploadCloud,
   UsersRound,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 function PageHeading({
@@ -63,6 +68,18 @@ function QueryFeedback({ loading, message, onRetry }: { loading?: boolean; messa
 
 const makeKey = () => crypto.randomUUID();
 
+type OPayProposal = {
+  provider: "OPay";
+  sourceReference: string | null;
+  amountMinor: string | null;
+  currency: string | null;
+  occurredAtIso: string | null;
+  confidence: "low" | "medium" | "high";
+  notes: string;
+};
+
+const toDateTimeLocal = (value: string | null) => value ? (value.includes("Z") ? new Date(value).toISOString().slice(0, 16) : value.slice(0, 16)) : "";
+
 const readAsBase64 = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -90,6 +107,29 @@ function FileLink({ fileId }: { fileId: string }) {
       <FileText className="size-3.5" /> Open file
     </button>
   );
+}
+
+function ReceiptPreviewAndExtract({ file, onUseProposal }: { file: { id: string; contentType: string; originalName: string }; onUseProposal: (proposal: OPayProposal) => void }) {
+  const scope = useControlScope();
+  const utils = trpc.useUtils();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileQuery = trpc.control.evidence.getFile.useQuery({ organisationId: scope.organisationId, fileId: file.id }, { enabled: false });
+  const proposals = trpc.control.evidence.extractionProposals.useQuery({ organisationId: scope.organisationId, fileId: file.id });
+  const extract = trpc.control.evidence.extractOpayReceipt.useMutation({
+    onSuccess: () => {
+      toast.success("OPay fields were proposed for review; no evidence was created or changed.");
+      utils.control.evidence.extractionProposals.invalidate({ organisationId: scope.organisationId, fileId: file.id });
+    },
+    onError: error => toast.error(error.message),
+  });
+  const latest = proposals.data?.[0]?.proposal as OPayProposal | undefined;
+  const preview = async () => {
+    const result = await fileQuery.refetch();
+    if (result.data?.url) setPreviewUrl(result.data.url);
+    else toast.error("Secure receipt preview is unavailable.");
+  };
+  const isImage = isImageReceipt(file.contentType);
+  return <div className="mt-3 flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" onClick={preview} className="h-8 rounded-lg text-xs"><Eye className="mr-1.5 size-3.5" />Preview</Button>{canExtractOpayReceipt(file.contentType) ? <Button type="button" size="sm" variant="outline" disabled={extract.isPending} onClick={() => extract.mutate({ organisationId: scope.organisationId, fileId: file.id, idempotencyKey: makeKey() })} className="h-8 rounded-lg border-violet-200 text-xs text-violet-800 hover:bg-violet-50"><Sparkles className="mr-1.5 size-3.5" />{extract.isPending ? "Reading receipt…" : "Extract OPay fields"}</Button> : null}{latest ? <div className="w-full rounded-xl border border-violet-100 bg-violet-50/60 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-extrabold text-violet-900">OPay proposal · {latest.confidence} confidence</p><Button type="button" size="sm" onClick={() => onUseProposal(latest)} className="h-8 rounded-lg bg-violet-700 text-xs hover:bg-violet-800">Review in evidence form</Button></div><p className="mt-2 text-xs text-violet-950">{latest.amountMinor && latest.currency ? `${formatMoney(latest.amountMinor, latest.currency)} · ` : ""}{latest.sourceReference ?? "No reference read"}</p><p className="mt-1 text-[11px] leading-4 text-violet-800">{latest.notes} Confirm every field before recording; extraction is not proof of settlement.</p></div> : null}<Dialog open={Boolean(previewUrl)} onOpenChange={open => { if (!open) setPreviewUrl(null); }}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Controlled receipt preview</DialogTitle><DialogDescription>{file.originalName}. This preview uses an authorised, time-limited file retrieval link.</DialogDescription></DialogHeader>{previewUrl ? (isImage ? <img src={previewUrl} alt={`Preview of ${file.originalName}`} className="max-h-[70vh] w-full rounded-xl border object-contain" /> : <iframe src={previewUrl} title={`Preview of ${file.originalName}`} className="h-[70vh] w-full rounded-xl border" />) : null}</DialogContent></Dialog></div>;
 }
 
 function ReconcileButton({
@@ -289,11 +329,12 @@ export function ReceivablesPage() {
   );
 }
 
-function EvidenceRecordDialog() {
+function EvidenceRecordDialog({ proposal }: { proposal: OPayProposal | null }) {
   const scope = useControlScope();
   const utils = trpc.useUtils();
   const obligations = trpc.control.obligations.list.useQuery(scope);
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (proposal) setOpen(true); }, [proposal]);
   const intake = trpc.control.evidence.intake.useMutation({
     onSuccess: response => {
       if ("status" in response && response.status === "duplicate") toast.message("This source reference is already protected as a duplicate.");
@@ -314,9 +355,9 @@ function EvidenceRecordDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Record independent evidence</DialogTitle>
-          <DialogDescription>The source reference protects the evidence trail from silent duplication. Do not place card, credential, or identity-document content in metadata.</DialogDescription>
+          <DialogDescription>{proposal ? "Review every OPay proposal before recording. It is not proof of settlement and no evidence exists until you submit this form." : "The source reference protects the evidence trail from silent duplication. Do not place card, credential, or identity-document content in metadata."}</DialogDescription>
         </DialogHeader>
-        <form className="grid gap-4" onSubmit={event => {
+        <form key={proposal?.sourceReference ?? "manual"} className="grid gap-4" onSubmit={event => {
           event.preventDefault();
           const data = new FormData(event.currentTarget);
           intake.mutate({
@@ -333,11 +374,11 @@ function EvidenceRecordDialog() {
         }}>
           <select name="kind" className="h-10 rounded-xl border bg-white px-3 text-sm" defaultValue="payment_observation"><option value="payment_observation">Payment observation</option><option value="settlement_evidence">Settlement evidence</option><option value="delivery_observation">Delivery observation</option></select>
           <select name="obligationId" className="h-10 rounded-xl border bg-white px-3 text-sm" defaultValue=""><option value="">Unlinked evidence</option>{obligations.data?.map(item => <option key={item.id} value={item.id}>{item.reference}</option>)}</select>
-          <Input name="amountMinor" required inputMode="numeric" placeholder="Exact minor units, e.g. 500000" />
-          <Input name="currency" required defaultValue="NGN" maxLength={3} />
-          <Input name="sourceName" required placeholder="Source name, e.g. bank_import" />
-          <Input name="sourceReference" required placeholder="Stable external reference" />
-          <Input name="occurredAt" type="datetime-local" />
+          <Input name="amountMinor" required inputMode="numeric" defaultValue={proposal?.amountMinor ?? ""} placeholder="Exact minor units, e.g. 500000" />
+          <Input name="currency" required defaultValue={proposal?.currency ?? "NGN"} maxLength={3} />
+          <Input name="sourceName" required defaultValue={proposal ? "OPay" : ""} placeholder="Source name, e.g. bank_import" />
+          <Input name="sourceReference" required defaultValue={proposal?.sourceReference ?? ""} placeholder="Stable external reference" />
+          <Input name="occurredAt" type="datetime-local" defaultValue={toDateTimeLocal(proposal?.occurredAtIso ?? null)} />
           <Button disabled={intake.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">Record evidence</Button>
         </form>
       </DialogContent>
@@ -400,13 +441,14 @@ export function EvidencePage() {
   const scope = useControlScope();
   const evidence = trpc.control.evidence.list.useQuery(scope);
   const files = trpc.control.evidence.files.useQuery(scope);
+  const [proposal, setProposal] = useState<OPayProposal | null>(null);
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeading
         eyebrow="Independent observation"
         title="Evidence intake"
         copy="Record delivery, payment, and settlement evidence with source references. Uploads stay in managed object storage; only secure metadata is retained in control records."
-        action={<div className="flex gap-2"><EvidenceUploadDialog /><EvidenceRecordDialog /></div>}
+        action={<div className="flex gap-2"><EvidenceUploadDialog /><EvidenceRecordDialog proposal={proposal} /></div>}
       />
       {evidence.isLoading ? <QueryFeedback loading message="Retrieving recorded evidence and derived control states." /> : evidence.isError ? <QueryFeedback message={evidence.error.message} onRetry={() => evidence.refetch()} /> : !evidence.data?.length ? (
         <EmptyState icon={FolderUp} title="No evidence received yet" copy="Payment, delivery, and independent settlement evidence will appear here with their source provenance and control state." />
@@ -430,7 +472,7 @@ export function EvidencePage() {
       {files.isError ? <QueryFeedback message={files.error.message} onRetry={() => files.refetch()} /> : files.data?.length ? (
         <section className="soft-card rounded-3xl border bg-card">
           <div className="border-b px-5 py-4"><p className="text-sm font-extrabold">Stored evidence files</p><p className="mt-1 text-xs text-muted-foreground">Authorised metadata and retrieval only.</p></div>
-          <div className="divide-y">{files.data.map(file => <div key={file.id} className="flex items-center justify-between gap-4 px-5 py-4"><div className="min-w-0"><p className="truncate text-sm font-extrabold">{file.originalName}</p><p className="mt-1 text-xs text-muted-foreground">{file.contentType} · {(file.sizeBytes / 1024).toFixed(0)} KB · {new Date(file.createdAt).toLocaleDateString()}</p></div><FileLink fileId={file.id} /></div>)}</div>
+          <div className="divide-y">{files.data.map(file => <div key={file.id} className="px-5 py-4"><div className="flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-700">{file.contentType.startsWith("image/") ? <Image className="size-4" /> : <FileText className="size-4" />}</div><div className="min-w-0"><p className="truncate text-sm font-extrabold">{file.originalName}</p><p className="mt-1 text-xs text-muted-foreground">{file.contentType} · {(file.sizeBytes / 1024).toFixed(0)} KB · {new Date(file.createdAt).toLocaleDateString()}</p></div></div><FileLink fileId={file.id} /></div><ReceiptPreviewAndExtract file={file} onUseProposal={setProposal} /></div>)}</div>
         </section>
       ) : null}
     </div>
@@ -440,6 +482,7 @@ export function EvidencePage() {
 function ExceptionResolutionControls({ exception }: { exception: { id: string; status: string; approvalRequired: number; createdByUserId: number } }) {
   const scope = useControlScope();
   const utils = trpc.useUtils();
+  const [rationale, setRationale] = useState("");
   const submit = trpc.control.exceptions.submitResolution.useMutation({
     onSuccess: () => { toast.success("Resolution recorded."); utils.control.exceptions.list.invalidate(scope); utils.control.dashboard.invalidate(scope); },
     onError: error => toast.error(error.message),
@@ -449,8 +492,17 @@ function ExceptionResolutionControls({ exception }: { exception: { id: string; s
     onError: error => toast.error(error.message),
   });
   if (["resolved", "rejected"].includes(exception.status)) return <div className="mt-5 flex items-center gap-2 border-t pt-4 text-xs font-bold text-emerald-700"><ShieldCheck className="size-4" />Resolution history retained in the audit trail.</div>;
-  if (exception.status === "pending_approval" && ["owner", "controller", "approver"].includes(scope.role)) return <div className="mt-5 flex flex-wrap gap-2 border-t pt-4"><Button disabled={approve.isPending} onClick={() => approve.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, approve: true })} className="rounded-xl bg-teal-700 hover:bg-teal-800"><CheckCircle2 className="mr-2 size-4" />Approve resolution</Button><Button disabled={approve.isPending} variant="outline" onClick={() => approve.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, approve: false })} className="rounded-xl">Return for review</Button></div>;
-  return <form className="mt-5 flex flex-col gap-2 border-t pt-4 sm:flex-row" onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); submit.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, note: String(data.get("note")) }); }}><Input name="note" required minLength={4} placeholder="Add accountable resolution note" /><Button type="submit" disabled={submit.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{exception.approvalRequired ? "Submit for approval" : "Resolve"}</Button></form>;
+  if (exception.status === "pending_approval" && ["owner", "controller", "approver"].includes(scope.role)) return <div className="mt-5 space-y-2 border-t pt-4"><p className="text-xs font-extrabold text-slate-700">Independent approval decision</p><div className="flex flex-col gap-2 sm:flex-row"><Input value={rationale} onChange={event => setRationale(event.target.value)} required minLength={4} placeholder="Record the approval or return rationale" /><Button disabled={approve.isPending || rationale.trim().length < 4} onClick={() => approve.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, approve: true, rationale: rationale.trim() })} className="rounded-xl bg-teal-700 hover:bg-teal-800"><CheckCircle2 className="mr-2 size-4" />Approve</Button><Button disabled={approve.isPending || rationale.trim().length < 4} variant="outline" onClick={() => approve.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, approve: false, rationale: rationale.trim() })} className="rounded-xl">Return</Button></div></div>;
+  return <form className="mt-5 flex flex-col gap-2 border-t pt-4 sm:flex-row" onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); submit.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, note: String(data.get("note")) }); }}><Input name="note" required minLength={4} placeholder="Record the proposed resolution and investigation basis" /><Button type="submit" disabled={submit.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">Submit for approval</Button></form>;
+}
+
+function ApprovalHistory({ exceptionId }: { exceptionId: string }) {
+  const scope = useControlScope();
+  const history = trpc.control.exceptions.approvalHistory.useQuery({ organisationId: scope.organisationId, exceptionId });
+  if (history.isLoading) return null;
+  if (history.isError) return <p className="mt-3 text-xs text-rose-700">Approval history could not load: {history.error.message}</p>;
+  if (!history.data?.length) return null;
+  return <section className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/50 p-4"><div className="flex items-center gap-2"><History className="size-4 text-violet-700" /><p className="text-xs font-extrabold text-violet-900">Approval decision trail</p></div><div className="mt-3 space-y-2">{history.data.map(item => <div key={item.id} className="rounded-xl bg-white/80 p-3"><p className="text-xs font-extrabold capitalize text-slate-800">{item.decision} <span className="font-medium text-muted-foreground">· {item.actorName ?? "Authorised user"}</span></p><p className="mt-1 text-xs leading-5 text-slate-700">{item.rationale}</p><p className="mt-2 font-mono text-[10px] text-muted-foreground">{new Date(item.createdAt).toLocaleString()} · {item.correlationId.slice(0, 10)}…</p></div>)}</div></section>;
 }
 
 function ExceptionNotes({ exceptionId }: { exceptionId: string }) {
@@ -498,6 +550,7 @@ export function ExceptionsPage() {
                 <div className="sm:text-right"><p className="money text-base font-medium">{formatMoney(item.valueImpactMinor, item.currency ?? "NGN")}</p><p className="mt-1 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">value impact</p></div>
               </div>
               <ExceptionResolutionControls exception={item} />
+              <ApprovalHistory exceptionId={item.id} />
               <ExceptionNotes exceptionId={item.id} />
             </article>
           ))}

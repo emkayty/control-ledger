@@ -33,7 +33,7 @@ function queuedDatabase(selections: unknown[][]) {
     insert: () => ({ values }),
     update: () => ({ set: (payload: Recorded) => ({ where: async () => { updates.push(payload); return { affectedRows: 1 }; } }) }),
     delete: () => ({ where: async () => ({ affectedRows: 1 }) }),
-    transaction: async (callback: (tx: { insert: () => { values: typeof values } }) => Promise<unknown>) => callback({ insert: () => ({ values }) }),
+    transaction: async (callback: (tx: { insert: () => { values: typeof values }; update: () => { set: (payload: Recorded) => { where: () => Promise<unknown> } } }) => Promise<unknown>) => callback({ insert: () => ({ values }), update: () => ({ set: (payload: Recorded) => ({ where: async () => { updates.push(payload); return { affectedRows: 1 }; } }) }) }),
   };
   return { database, inserted, updates };
 }
@@ -210,7 +210,7 @@ describe("material control action procedures", () => {
     ]);
     getDbMock.mockResolvedValue(database);
 
-    const result = await appRouter.createCaller(authContext()).control.exceptions.approveResolution({ organisationId, exceptionId: "f46d6411-e7e7-4fc1-94a7-72a1475e0211", approve: true });
+    const result = await appRouter.createCaller(authContext()).control.exceptions.approveResolution({ organisationId, exceptionId: "f46d6411-e7e7-4fc1-94a7-72a1475e0211", approve: true, rationale: "Evidence and allocation were independently reviewed." });
 
     expect(result.status).toBe("resolved");
     expect(updates[0]).toMatchObject({ status: "resolved", resolvedByUserId: 1 });

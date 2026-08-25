@@ -264,6 +264,39 @@ export const exceptionNotes = mysqlTable(
   table => [index("exception_notes_exception_index").on(table.exceptionId)],
 );
 
+export const exceptionApprovalDecisions = mysqlTable(
+  "exceptionApprovalDecisions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    exceptionId: varchar("exceptionId", { length: 36 }).notNull(),
+    decision: mysqlEnum("decision", ["submitted", "approved", "returned"]).notNull(),
+    rationale: text("rationale").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("exception_approval_decision_index").on(table.organisationId, table.branchId, table.exceptionId, table.createdAt)],
+);
+
+export const receiptExtractionProposals = mysqlTable(
+  "receiptExtractionProposals",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    evidenceFileId: varchar("evidenceFileId", { length: 36 }).notNull(),
+    provider: varchar("provider", { length: 48 }).notNull(),
+    confidence: mysqlEnum("confidence", ["low", "medium", "high"]).notNull(),
+    proposal: json("proposal").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("receipt_extraction_file_index").on(table.organisationId, table.branchId, table.evidenceFileId, table.createdAt)],
+);
+
 export const integrationIntakeRecords = mysqlTable(
   "integrationIntakeRecords",
   {
