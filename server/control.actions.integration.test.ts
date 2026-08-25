@@ -16,12 +16,13 @@ function authContext(): TrpcContext {
   };
 }
 
-function queuedDatabase(selections: unknown[][]) {
+function queuedDatabase(selections: unknown[][], updateAffectedRows = 1) {
   const inserted: Recorded[] = [];
   const updates: Recorded[] = [];
   const executableRows = (rows: unknown[]) => {
-    const query = Promise.resolve(rows) as Promise<unknown[]> & { limit: () => Promise<unknown[]> };
+    const query = Promise.resolve(rows) as Promise<unknown[]> & { limit: () => Promise<unknown[]>; orderBy: () => { limit: () => Promise<unknown[]> } };
     query.limit = async () => rows;
+    query.orderBy = () => ({ limit: async () => rows });
     return query;
   };
   const values = async (payload: Recorded) => {
@@ -31,9 +32,9 @@ function queuedDatabase(selections: unknown[][]) {
   const database = {
     select: () => ({ from: () => ({ where: () => executableRows(selections.shift() ?? []) }) }),
     insert: () => ({ values }),
-    update: () => ({ set: (payload: Recorded) => ({ where: async () => { updates.push(payload); return { affectedRows: 1 }; } }) }),
+    update: () => ({ set: (payload: Recorded) => ({ where: async () => { updates.push(payload); return { affectedRows: updateAffectedRows }; } }) }),
     delete: () => ({ where: async () => ({ affectedRows: 1 }) }),
-    transaction: async (callback: (tx: { insert: () => { values: typeof values }; update: () => { set: (payload: Recorded) => { where: () => Promise<unknown> } } }) => Promise<unknown>) => callback({ insert: () => ({ values }), update: () => ({ set: (payload: Recorded) => ({ where: async () => { updates.push(payload); return { affectedRows: 1 }; } }) }) }),
+    transaction: async (callback: (tx: { insert: () => { values: typeof values }; update: () => { set: (payload: Recorded) => { where: () => Promise<unknown> } } }) => Promise<unknown>) => callback({ insert: () => ({ values }), update: () => ({ set: (payload: Recorded) => ({ where: async () => { updates.push(payload); return { affectedRows: updateAffectedRows }; } }) }) }),
   };
   return { database, inserted, updates };
 }
@@ -207,6 +208,7 @@ describe("material control action procedures", () => {
     const { database, updates } = queuedDatabase([
       [{ id: "exception-1", organisationId, branchId, status: "pending_approval", createdByUserId: 9 }],
       [{ id: "approver", organisationId, userId: 1, branchId, role: "approver", isActive: 1 }],
+      [{ createdByUserId: 9 }],
     ]);
     getDbMock.mockResolvedValue(database);
 
@@ -214,6 +216,29 @@ describe("material control action procedures", () => {
 
     expect(result.status).toBe("resolved");
     expect(updates[0]).toMatchObject({ status: "resolved", resolvedByUserId: 1 });
+  });
+
+  it("rejects an approval attempt by the user who submitted the resolution", async () => {
+    const { database } = queuedDatabase([
+      [{ id: "exception-1", organisationId, branchId, status: "pending_approval", createdByUserId: 9 }],
+      [{ id: "approver", organisationId, userId: 1, branchId, role: "approver", isActive: 1 }],
+      [{ createdByUserId: 1 }],
+    ]);
+    getDbMock.mockResolvedValue(database);
+
+    await expect(appRouter.createCaller(authContext()).control.exceptions.approveResolution({ organisationId, exceptionId: "f46d6411-e7e7-4fc1-94a7-72a1475e0211", approve: true, rationale: "Attempted self approval." })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects a competing approval when the pending state was already changed", async () => {
+    const { database, inserted } = queuedDatabase([
+      [{ id: "exception-1", organisationId, branchId, status: "pending_approval", createdByUserId: 9 }],
+      [{ id: "approver", organisationId, userId: 1, branchId, role: "approver", isActive: 1 }],
+      [{ createdByUserId: 9 }],
+    ], 0);
+    getDbMock.mockResolvedValue(database);
+
+    await expect(appRouter.createCaller(authContext()).control.exceptions.approveResolution({ organisationId, exceptionId: "f46d6411-e7e7-4fc1-94a7-72a1475e0211", approve: true, rationale: "Independent review after concurrent change." })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(inserted).toHaveLength(0);
   });
 
   it("allows only an owner to create a branch", async () => {

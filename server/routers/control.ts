@@ -8,6 +8,7 @@ import {
   controlExceptions,
   customers,
   evidenceAssociationCorrections,
+  evidenceFileAccessGrants,
   evidenceEvents,
   evidenceFiles,
   exceptionApprovalDecisions,
@@ -29,8 +30,9 @@ import { calculateAvailableAllocation, determineReconciliation } from "../contro
 import { parseReceiptProposalResponse } from "../control/receiptExtraction";
 import { nextExceptionStatus } from "../control/varianceApproval";
 import { summariseVariancePortfolio } from "../control/variancePortfolio";
+import { createFileAccessGrant } from "../control/fileAccess";
 import { getDb } from "../db";
-import { storageGet, storageGetSignedUrl, storagePut } from "../storage";
+import { storageGetSignedUrl, storagePut } from "../storage";
 import { invokeLLM, listLLMModels } from "../_core/llm";
 import { protectedProcedure, router } from "../_core/trpc";
 
@@ -613,7 +615,15 @@ export const controlRouter = router({
       const file = await db.select().from(evidenceFiles).where(and(eq(evidenceFiles.id, input.fileId), eq(evidenceFiles.organisationId, input.organisationId))).limit(1);
       if (!file[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Evidence file not found." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: file[0].branchId, allowed: permissions.read });
-      return { ...file[0], url: (await storageGet(file[0].storageKey)).url };
+      const grant = createFileAccessGrant();
+      await db.insert(evidenceFileAccessGrants).values({ id: recordId(), organisationId: file[0].organisationId, branchId: file[0].branchId, evidenceFileId: file[0].id, userId: ctx.user.id, tokenHash: grant.tokenHash, expiresAt: grant.expiresAt });
+      return {
+        id: file[0].id,
+        originalName: file[0].originalName,
+        contentType: file[0].contentType,
+        sizeBytes: file[0].sizeBytes,
+        url: `/manus-storage/grant/${grant.token}`,
+      };
     }),
   }),
 
@@ -698,13 +708,14 @@ export const controlRouter = router({
       const [exception] = await db.select().from(controlExceptions).where(and(eq(controlExceptions.id, input.exceptionId), eq(controlExceptions.organisationId, input.organisationId))).limit(1);
       if (!exception) throw new TRPCError({ code: "NOT_FOUND", message: "Exception not found." });
       if (["resolved", "rejected"].includes(exception.status)) throw new TRPCError({ code: "CONFLICT", message: "A closed exception cannot be resubmitted." });
+      if (exception.status === "pending_approval") throw new TRPCError({ code: "CONFLICT", message: "This exception already has a decision awaiting independent approval." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.resolve });
       const correlationId = correlation();
       await db.transaction(async tx => {
         await tx.update(controlExceptions).set({ status: nextExceptionStatus("submitted"), approvalRequired: 1, resolutionNote: input.note, resolvedAt: null, resolvedByUserId: null }).where(eq(controlExceptions.id, exception.id));
         await tx.insert(exceptionApprovalDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: exception.branchId, exceptionId: exception.id, decision: "submitted", rationale: input.note, correlationId, createdByUserId: ctx.user.id });
+        await tx.insert(auditEvents).values({ id: recordId(), organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.resolution_submitted", entityType: "control_exception", entityId: exception.id, correlationId, metadata: { approvalRequired: true } });
       });
-      await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.resolution_submitted", entityType: "control_exception", entityId: exception.id, correlationId, metadata: { approvalRequired: true } });
       return { status: "pending_approval" as const };
     }),
     approveResolution: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid(), approve: z.boolean(), rationale: z.string().min(4).max(4000) })).mutation(async ({ ctx, input }) => {
@@ -714,13 +725,18 @@ export const controlRouter = router({
       if (exception.status !== "pending_approval") throw new TRPCError({ code: "CONFLICT", message: "This exception is not awaiting approval." });
       if (exception.createdByUserId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "The exception initiator cannot approve its own resolution." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.approve });
+      const [submittedDecision] = await db.select({ createdByUserId: exceptionApprovalDecisions.createdByUserId }).from(exceptionApprovalDecisions).where(and(eq(exceptionApprovalDecisions.organisationId, input.organisationId), eq(exceptionApprovalDecisions.exceptionId, exception.id), eq(exceptionApprovalDecisions.decision, "submitted"))).orderBy(desc(exceptionApprovalDecisions.createdAt)).limit(1);
+      if (!submittedDecision) throw new TRPCError({ code: "CONFLICT", message: "This exception has no submitted resolution decision to review." });
+      if (submittedDecision.createdByUserId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "The resolution submitter cannot approve their own submission." });
       const correlationId = correlation();
       const decision = input.approve ? "approved" as const : "returned" as const;
       await db.transaction(async tx => {
-        await tx.update(controlExceptions).set({ status: nextExceptionStatus(decision), resolvedAt: input.approve ? new Date() : null, resolvedByUserId: input.approve ? ctx.user.id : null }).where(eq(controlExceptions.id, exception.id));
+        const updateResult = await tx.update(controlExceptions).set({ status: nextExceptionStatus(decision), resolvedAt: input.approve ? new Date() : null, resolvedByUserId: input.approve ? ctx.user.id : null }).where(and(eq(controlExceptions.id, exception.id), eq(controlExceptions.status, "pending_approval")));
+        const affectedRows = Number((updateResult as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+        if (affectedRows !== 1) throw new TRPCError({ code: "CONFLICT", message: "This exception was already decided by another reviewer." });
         await tx.insert(exceptionApprovalDecisions).values({ id: recordId(), organisationId: input.organisationId, branchId: exception.branchId, exceptionId: exception.id, decision, rationale: input.rationale, correlationId, createdByUserId: ctx.user.id });
+        await tx.insert(auditEvents).values({ id: recordId(), organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: input.approve ? "exception.approved" : "exception.returned", entityType: "control_exception", entityId: exception.id, correlationId, metadata: { rationale: input.rationale } });
       });
-      await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: input.approve ? "exception.approved" : "exception.returned", entityType: "control_exception", entityId: exception.id, correlationId, metadata: { rationale: input.rationale } });
       return { status: input.approve ? "resolved" : "investigating" };
     }),
   }),

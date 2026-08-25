@@ -59,3 +59,11 @@
 - [x] Add UI component tests for secure receipt preview controls and proposal-to-evidence-form prefilling behavior.
 - [ ] Perform and record authenticated desktop/mobile validation of the new approval workflow, cross-branch variance summary, secure receipt preview, and OPay proposal flow before release.
 - [x] Replace stale dashboard branch-validation guidance now that the authorised KAD-09 branch and selector validation are complete.
+- [ ] Conduct a critical release-readiness evaluation against Release 1 business-control, security, auditability, usability, and operational goals.
+- [ ] Document verified achievements, residual risks, validation limits, and a clear professional readiness conclusion.
+- [x] Strengthen approval independence by preventing the user who submitted a resolution from approving that same submission, even when they did not create the original exception.
+- [ ] Make material control-state mutations and their corresponding audit-event inserts atomic within one transaction, with failure tests for audit-write rollback.
+- [x] Add race-safe approval finalisation so concurrent approvers cannot append competing decisions after one resolution has already changed state.
+- [ ] Define and surface receipt-extraction data-governance controls, including authorised-use notice, retention/processing policy, and an organisation-level enablement choice.
+- [ ] Complete real-device signed-in production acceptance checks for the enhanced dashboard, evidence, exception, and audit flows without submitting a resolution or changing evidence.
+- [ ] Replace the unauthenticated managed-storage redirect with an authenticated, tenant- and branch-scoped receipt-delivery route so possession or discovery of a storage key cannot bypass file access controls.

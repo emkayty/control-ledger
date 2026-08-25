@@ -195,6 +195,24 @@ export const evidenceFiles = mysqlTable(
   ],
 );
 
+export const evidenceFileAccessGrants = mysqlTable(
+  "evidenceFileAccessGrants",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    evidenceFileId: varchar("evidenceFileId", { length: 36 }).notNull(),
+    userId: int("userId").notNull(),
+    tokenHash: varchar("tokenHash", { length: 128 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("evidence_file_access_token_unique").on(table.tokenHash),
+    index("evidence_file_access_scope_expiry_index").on(table.organisationId, table.branchId, table.evidenceFileId, table.userId, table.expiresAt),
+  ],
+);
+
 export const reconciliationLinks = mysqlTable(
   "reconciliationLinks",
   {
