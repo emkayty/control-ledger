@@ -47,3 +47,9 @@ The final policy-management rendering adds specific processing scope and retenti
 The first production page load after checkpoint `83cf68db` still displayed the preceding **Extract OPay fields** control and not the new disabled-policy notice. That observation is treated as a deployment-propagation state, not acceptance of the governance remediation. No extraction was triggered and no record changed.
 
 A subsequent signed-in production check continued to return the preceding control set, including **Extract OPay fields**, rather than the new fail-closed policy card. The governance checkpoint is therefore still not accepted as active on the production domain. The persisted database policy itself remains disabled; no extraction action was triggered.
+
+## 25 August 2026 — governance deployment verified
+
+After the final assessment checkpoint propagated, the signed-in Main-branch production evidence page displayed the deployed fail-closed state: **“OPay extraction is disabled for this organisation”**, the processing-scope and retention-boundary notice, and the owner-only **“Review processing notice”** control. The prior direct extraction button was absent. The stored receipt Preview control and the existing high-confidence human-review proposal remained present. No extraction, evidence form submission, resolution, approval, or settlement action was taken.
+
+The authorised Preview action was then exercised without changing any record. It opened the controlled receipt modal successfully and used a provider-signed URL with an expiry parameter and signature, rather than returning a raw storage key or raw storage URL in the application control. The modal was not used to submit, extract, reconcile, resolve, or approve anything.

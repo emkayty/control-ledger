@@ -64,8 +64,40 @@ function branchCreateDatabase(duplicateCode = false) {
       return { affectedRows: 1 };
     } }) }),
     delete: () => ({ where: async () => ({ affectedRows: 1 }) }),
+    transaction: async (callback: (transaction: { insert: () => { values: (payload: Recorded) => Promise<{ affectedRows: number }> } }) => Promise<unknown>) => callback({ insert: () => ({ values: async (payload: Recorded) => {
+      inserted.push(payload);
+      if (payload.action === "branch.create") idempotencyRecord = { ...payload };
+      return { affectedRows: 1 };
+    } }) }),
   };
   return { database, inserted, updates };
+}
+
+function rollbackOnAuditFailureDatabase(selections: unknown[][]) {
+  const inserted: Recorded[] = [];
+  const executableRows = (rows: unknown[]) => {
+    const query = Promise.resolve(rows) as Promise<unknown[]> & { limit: () => Promise<unknown[]>; orderBy: () => { limit: () => Promise<unknown[]> } };
+    query.limit = async () => rows;
+    query.orderBy = () => ({ limit: async () => rows });
+    return query;
+  };
+  const database = {
+    select: () => ({ from: () => ({ where: () => executableRows(selections.shift() ?? []) }) }),
+    insert: () => ({ values: async (payload: Recorded) => { inserted.push(payload); return { affectedRows: 1 }; } }),
+    update: () => ({ set: () => ({ where: async () => ({ affectedRows: 1 }) }) }),
+    delete: () => ({ where: async () => ({ affectedRows: 1 }) }),
+    transaction: async (callback: (transaction: { insert: () => { values: (payload: Recorded) => Promise<{ affectedRows: number }> } }) => Promise<unknown>) => {
+      const staged: Recorded[] = [];
+      const transaction = { insert: () => ({ values: async (payload: Recorded) => {
+        if (payload.action === "obligation.recorded") throw new Error("simulated audit write failure");
+        staged.push(payload);
+        return { affectedRows: 1 };
+      } }) };
+      await callback(transaction);
+      inserted.push(...staged);
+    },
+  };
+  return { database, inserted };
 }
 
 const organisationId = "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0";
@@ -128,6 +160,21 @@ describe("material control action procedures", () => {
 
     expect(result.replayed).toBe(false);
     expect(inserted.some(row => row.correctsObligationId === obligationId && row.sourceType === "correction")).toBe(true);
+  });
+
+  it("rolls back a receivable write when its in-transaction audit insert fails", async () => {
+    const customerId = "9b52d5e3-74c4-45a6-a2ec-207ab249ff0e";
+    const { database, inserted } = rollbackOnAuditFailureDatabase([
+      membership,
+      branch,
+      [{ id: customerId, organisationId, branchId }],
+      [],
+    ]);
+    getDbMock.mockResolvedValue(database);
+
+    await expect(appRouter.createCaller(authContext()).control.obligations.create({ organisationId, branchId, customerId, reference: "INV-AUDIT-ROLLBACK", amountMinor: "500000", currency: "NGN", idempotencyKey: "obligation-audit-rollback-1" })).rejects.toThrow("simulated audit write failure");
+    expect(inserted.some(row => row.reference === "INV-AUDIT-ROLLBACK")).toBe(false);
+    expect(inserted.some(row => row.action === "obligation.recorded")).toBe(false);
   });
 
   it("records an append-only evidence association correction for an in-scope receivable", async () => {

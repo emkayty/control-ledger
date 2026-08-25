@@ -57,6 +57,19 @@ async function writeAudit(input: {
   await db.insert(auditEvents).values({ id: recordId(), ...input });
 }
 
+async function writeAuditInTransaction(transaction: { insert: any }, input: {
+  organisationId: string;
+  branchId?: string;
+  actorUserId: number;
+  action: string;
+  entityType: string;
+  entityId: string;
+  correlationId: string;
+  metadata?: Record<string, unknown>;
+}) {
+  await transaction.insert(auditEvents).values({ id: recordId(), ...input });
+}
+
 async function requireExistingScope(input: { organisationId: string; branchId: string; userId: number; allowed: readonly any[] }) {
   await requireScopedMembership(input);
   const db = await getDb();
@@ -221,8 +234,10 @@ export const controlRouter = router({
           const duplicate = await db.select({ id: branches.id }).from(branches).where(and(eq(branches.organisationId, input.organisationId), eq(branches.code, code))).limit(1);
           if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "This branch code already exists in the organisation." });
           const entityId = recordId(); const correlationId = correlation();
-          await db.insert(branches).values({ id: entityId, organisationId: input.organisationId, name: input.name.trim(), code });
-          await writeAudit({ organisationId: input.organisationId, branchId: entityId, actorUserId: ctx.user.id, action: "branch.created", entityType: "branch", entityId, correlationId, metadata: { name: input.name.trim(), code } });
+          await db.transaction(async transaction => {
+            await transaction.insert(branches).values({ id: entityId, organisationId: input.organisationId, name: input.name.trim(), code });
+            await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: entityId, actorUserId: ctx.user.id, action: "branch.created", entityType: "branch", entityId, correlationId, metadata: { name: input.name.trim(), code } });
+          });
           return { entityId, correlationId };
         },
       });
@@ -289,9 +304,11 @@ export const controlRouter = router({
           const correlationId = correlation();
           const existing = await db.select().from(organisationMemberships).where(and(eq(organisationMemberships.organisationId, input.organisationId), eq(organisationMemberships.userId, target[0].id), input.branchId ? eq(organisationMemberships.branchId, input.branchId) : isNull(organisationMemberships.branchId))).limit(1);
           const entityId = existing[0]?.id ?? recordId();
-          if (existing[0]) await db.update(organisationMemberships).set({ role: input.role, isActive: 1 }).where(eq(organisationMemberships.id, existing[0].id));
-          else await db.insert(organisationMemberships).values({ id: entityId, organisationId: input.organisationId, userId: target[0].id, branchId: input.branchId, role: input.role });
-          await writeAudit({ organisationId: input.organisationId, branchId: input.branchId ?? undefined, actorUserId: ctx.user.id, action: existing[0] ? "membership.updated" : "membership.granted", entityType: "organisation_membership", entityId, correlationId, metadata: { targetUserId: target[0].id, role: input.role, branchId: input.branchId } });
+          await db.transaction(async transaction => {
+            if (existing[0]) await transaction.update(organisationMemberships).set({ role: input.role, isActive: 1 }).where(eq(organisationMemberships.id, existing[0].id));
+            else await transaction.insert(organisationMemberships).values({ id: entityId, organisationId: input.organisationId, userId: target[0].id, branchId: input.branchId, role: input.role });
+            await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: input.branchId ?? undefined, actorUserId: ctx.user.id, action: existing[0] ? "membership.updated" : "membership.granted", entityType: "organisation_membership", entityId, correlationId, metadata: { targetUserId: target[0].id, role: input.role, branchId: input.branchId } });
+          });
           return { entityId, correlationId };
         },
       });
@@ -308,8 +325,10 @@ export const controlRouter = router({
         organisationId: input.organisationId, userId: ctx.user.id, action: "membership.revoke", idempotencyKey: input.idempotencyKey, request: input,
         execute: async () => {
           const correlationId = correlation();
-          await db.update(organisationMemberships).set({ isActive: 0 }).where(eq(organisationMemberships.id, target[0].id));
-          await writeAudit({ organisationId: input.organisationId, branchId: target[0].branchId ?? undefined, actorUserId: ctx.user.id, action: "membership.revoked", entityType: "organisation_membership", entityId: target[0].id, correlationId, metadata: { targetUserId: target[0].userId, role: target[0].role, branchId: target[0].branchId } });
+          await db.transaction(async transaction => {
+            await transaction.update(organisationMemberships).set({ isActive: 0 }).where(eq(organisationMemberships.id, target[0].id));
+            await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: target[0].branchId ?? undefined, actorUserId: ctx.user.id, action: "membership.revoked", entityType: "organisation_membership", entityId: target[0].id, correlationId, metadata: { targetUserId: target[0].userId, role: target[0].role, branchId: target[0].branchId } });
+          });
           return { entityId: target[0].id, correlationId };
         },
       });
@@ -378,8 +397,10 @@ export const controlRouter = router({
             const db = await getDb();
             if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
             const entityId = recordId(); const correlationId = correlation();
-            await db.insert(customers).values({ ...input, id: entityId, code: input.code.toUpperCase(), createdByUserId: ctx.user.id });
-            await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "customer.created", entityType: "customer", entityId, correlationId, metadata: { code: input.code.toUpperCase() } });
+            await db.transaction(async transaction => {
+              await transaction.insert(customers).values({ ...input, id: entityId, code: input.code.toUpperCase(), createdByUserId: ctx.user.id });
+              await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "customer.created", entityType: "customer", entityId, correlationId, metadata: { code: input.code.toUpperCase() } });
+            });
             return { entityId, correlationId };
           },
         });
@@ -402,8 +423,10 @@ export const controlRouter = router({
           organisationId: input.organisationId, userId: ctx.user.id, action: "obligation.create", idempotencyKey: input.idempotencyKey, request: input,
           execute: async () => {
             const entityId = recordId(); const correlationId = correlation();
-            await db.insert(receivableObligations).values({ ...input, id: entityId, amountMinor: input.amountMinor, sourceType: "manual", correlationId, createdByUserId: ctx.user.id });
-            await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "obligation.recorded", entityType: "receivable_obligation", entityId, correlationId, metadata: { reference: input.reference, amountMinor: input.amountMinor, currency: input.currency } });
+            await db.transaction(async transaction => {
+              await transaction.insert(receivableObligations).values({ ...input, id: entityId, amountMinor: input.amountMinor, sourceType: "manual", correlationId, createdByUserId: ctx.user.id });
+              await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "obligation.recorded", entityType: "receivable_obligation", entityId, correlationId, metadata: { reference: input.reference, amountMinor: input.amountMinor, currency: input.currency } });
+            });
             return { entityId, correlationId };
           },
         });
@@ -419,8 +442,10 @@ export const controlRouter = router({
           organisationId: input.organisationId, userId: ctx.user.id, action: "obligation.correct", idempotencyKey: input.idempotencyKey, request: input,
           execute: async () => {
             const entityId = recordId(); const correlationId = correlation();
-            await db.insert(receivableObligations).values({ id: entityId, organisationId: original.organisationId, branchId: original.branchId, customerId: original.customerId, reference: `${original.reference}-COR-${entityId.slice(0, 6).toUpperCase()}`, amountMinor: input.amountMinor, currency: original.currency, dueAt: original.dueAt, status: "open", sourceType: "correction", sourceReference: original.reference, sourceMetadata: { reason: input.reason, originalObligationId: original.id }, correlationId, createdByUserId: ctx.user.id, correctsObligationId: original.id });
-            await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "obligation.correction_recorded", entityType: "receivable_obligation", entityId, correlationId, metadata: { correctsObligationId: original.id, reason: input.reason, amountMinor: input.amountMinor } });
+            await db.transaction(async transaction => {
+              await transaction.insert(receivableObligations).values({ id: entityId, organisationId: original.organisationId, branchId: original.branchId, customerId: original.customerId, reference: `${original.reference}-COR-${entityId.slice(0, 6).toUpperCase()}`, amountMinor: input.amountMinor, currency: original.currency, dueAt: original.dueAt, status: "open", sourceType: "correction", sourceReference: original.reference, sourceMetadata: { reason: input.reason, originalObligationId: original.id }, correlationId, createdByUserId: ctx.user.id, correctsObligationId: original.id });
+              await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "obligation.correction_recorded", entityType: "receivable_obligation", entityId, correlationId, metadata: { correctsObligationId: original.id, reason: input.reason, amountMinor: input.amountMinor } });
+            });
             return { entityId, correlationId };
           },
         });
@@ -513,8 +538,10 @@ export const controlRouter = router({
           organisationId: input.organisationId, userId: ctx.user.id, action: "evidence.correct", idempotencyKey: input.idempotencyKey, request: input,
           execute: async () => {
             const entityId = recordId(); const correlationId = correlation();
-            await db.insert(evidenceEvents).values({ id: entityId, organisationId: original.organisationId, branchId: original.branchId, obligationId: original.obligationId, customerId: original.customerId, kind: "correction", status: "recorded", amountMinor: input.amountMinor, currency: original.currency, sourceName: "correction", sourceReference: `${original.id}-COR-${entityId.slice(0, 6).toUpperCase()}`, sourceMetadata: { reason: input.reason, originalEvidenceEventId: original.id }, occurredAt: new Date(), correlationId, correctsEventId: original.id, createdByUserId: ctx.user.id });
-            await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.correction_recorded", entityType: "evidence_event", entityId, correlationId, metadata: { correctsEventId: original.id, reason: input.reason, amountMinor: input.amountMinor } });
+            await db.transaction(async transaction => {
+              await transaction.insert(evidenceEvents).values({ id: entityId, organisationId: original.organisationId, branchId: original.branchId, obligationId: original.obligationId, customerId: original.customerId, kind: "correction", status: "recorded", amountMinor: input.amountMinor, currency: original.currency, sourceName: "correction", sourceReference: `${original.id}-COR-${entityId.slice(0, 6).toUpperCase()}`, sourceMetadata: { reason: input.reason, originalEvidenceEventId: original.id }, occurredAt: new Date(), correlationId, correctsEventId: original.id, createdByUserId: ctx.user.id });
+              await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.correction_recorded", entityType: "evidence_event", entityId, correlationId, metadata: { correctsEventId: original.id, reason: input.reason, amountMinor: input.amountMinor } });
+            });
             return { entityId, correlationId };
           },
         });
@@ -532,8 +559,10 @@ export const controlRouter = router({
           organisationId: input.organisationId, userId: ctx.user.id, action: "evidence.correct_association", idempotencyKey: input.idempotencyKey, request: input,
           execute: async () => {
             const entityId = recordId(); const correlationId = correlation();
-            await db.insert(evidenceAssociationCorrections).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, evidenceEventId: input.evidenceEventId, obligationId: input.obligationId, reason: input.reason, correlationId, createdByUserId: ctx.user.id });
-            await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.association_corrected", entityType: "evidence_association_correction", entityId, correlationId, metadata: { evidenceEventId: input.evidenceEventId, obligationId: input.obligationId, reason: input.reason } });
+            await db.transaction(async transaction => {
+              await transaction.insert(evidenceAssociationCorrections).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, evidenceEventId: input.evidenceEventId, obligationId: input.obligationId, reason: input.reason, correlationId, createdByUserId: ctx.user.id });
+              await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.association_corrected", entityType: "evidence_association_correction", entityId, correlationId, metadata: { evidenceEventId: input.evidenceEventId, obligationId: input.obligationId, reason: input.reason } });
+            });
             return { entityId, correlationId };
           },
         });
@@ -591,8 +620,10 @@ export const controlRouter = router({
             throw new TRPCError({ code: "BAD_GATEWAY", message: "Receipt extraction did not return a structured proposal. Please review the receipt manually." });
           }
           const entityId = recordId(); const correlationId = correlation();
-          await db.insert(receiptExtractionProposals).values({ id: entityId, organisationId: input.organisationId, branchId: file.branchId, evidenceFileId: file.id, provider: proposal.provider, confidence: proposal.confidence, proposal, correlationId, createdByUserId: ctx.user.id });
-          await writeAudit({ organisationId: input.organisationId, branchId: file.branchId, actorUserId: ctx.user.id, action: "evidence.receipt_extraction_proposed", entityType: "receipt_extraction_proposal", entityId, correlationId, metadata: { evidenceFileId: file.id, provider: proposal.provider, confidence: proposal.confidence } });
+          await db.transaction(async transaction => {
+            await transaction.insert(receiptExtractionProposals).values({ id: entityId, organisationId: input.organisationId, branchId: file.branchId, evidenceFileId: file.id, provider: proposal.provider, confidence: proposal.confidence, proposal, correlationId, createdByUserId: ctx.user.id });
+            await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: file.branchId, actorUserId: ctx.user.id, action: "evidence.receipt_extraction_proposed", entityType: "receipt_extraction_proposal", entityId, correlationId, metadata: { evidenceFileId: file.id, provider: proposal.provider, confidence: proposal.confidence } });
+          });
           return { entityId, correlationId };
         },
       });
@@ -627,8 +658,10 @@ export const controlRouter = router({
           const entityId = recordId(); const correlationId = correlation();
           const safeName = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
           const { key, url } = await storagePut(`${input.organisationId}/${input.branchId}/evidence/${entityId}-${safeName}`, fileBytes, input.contentType);
-          await db.insert(evidenceFiles).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, evidenceEventId: input.evidenceEventId, exceptionId: input.exceptionId, storageKey: key, storageUrl: url, originalName: safeName, contentType: input.contentType, sizeBytes: fileBytes.length, checksum: sha256(input.contentBase64), correlationId, createdByUserId: ctx.user.id });
-          await writeAudit({ organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.file_uploaded", entityType: "evidence_file", entityId, correlationId, metadata: { contentType: input.contentType, sizeBytes: fileBytes.length } });
+          await db.transaction(async transaction => {
+            await transaction.insert(evidenceFiles).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, evidenceEventId: input.evidenceEventId, exceptionId: input.exceptionId, storageKey: key, storageUrl: url, originalName: safeName, contentType: input.contentType, sizeBytes: fileBytes.length, checksum: sha256(input.contentBase64), correlationId, createdByUserId: ctx.user.id });
+            await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "evidence.file_uploaded", entityType: "evidence_file", entityId, correlationId, metadata: { contentType: input.contentType, sizeBytes: fileBytes.length } });
+          });
           return { entityId, correlationId };
         },
       });
@@ -713,9 +746,11 @@ export const controlRouter = router({
       if (!exception) throw new TRPCError({ code: "NOT_FOUND", message: "Exception not found." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.resolve });
       const id = recordId(); const correlationId = correlation();
-      await db.insert(exceptionNotes).values({ id, exceptionId: exception.id, organisationId: input.organisationId, body: input.body, createdByUserId: ctx.user.id, correlationId });
-      if (exception.status === "open") await db.update(controlExceptions).set({ status: "investigating" }).where(eq(controlExceptions.id, exception.id));
-      await writeAudit({ organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.note_added", entityType: "control_exception", entityId: exception.id, correlationId });
+      await db.transaction(async transaction => {
+        await transaction.insert(exceptionNotes).values({ id, exceptionId: exception.id, organisationId: input.organisationId, body: input.body, createdByUserId: ctx.user.id, correlationId });
+        if (exception.status === "open") await transaction.update(controlExceptions).set({ status: "investigating" }).where(eq(controlExceptions.id, exception.id));
+        await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.note_added", entityType: "control_exception", entityId: exception.id, correlationId });
+      });
       return { id };
     }),
     approvalHistory: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid() })).query(async ({ ctx, input }) => {

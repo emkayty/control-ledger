@@ -24,6 +24,7 @@ function database(rows: unknown[][]) {
     insert: () => ({ values: async (payload: Record<string, unknown>) => { inserted.push(payload); return { affectedRows: 1 }; } }),
     update: () => ({ set: () => ({ where: async () => ({ affectedRows: 1 }) }) }),
     delete: () => ({ where: async () => ({ affectedRows: 1 }) }),
+    transaction: async (callback: (transaction: { insert: () => { values: (payload: Record<string, unknown>) => Promise<{ affectedRows: number }> } }) => Promise<unknown>) => callback({ insert: () => ({ values: async (payload: Record<string, unknown>) => { inserted.push(payload); return { affectedRows: 1 }; } }) }),
   };
   return { db, inserted };
 }
