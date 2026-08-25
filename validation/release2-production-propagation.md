@@ -11,3 +11,7 @@ Production Release 2 route availability and real-device authenticated acceptance
 ## Follow-up observation
 
 A second passive check of `/operations` still returned the hosting-level 404. The published root remained reachable but continued to show the earlier Release 1 navigation without **Operations** or **Collections**. A production-log request returned `cloudrun service not found`, so no live-container diagnosis was available from that endpoint. No conclusion beyond **production propagation is not yet verified** is warranted.
+
+A cache-busting root request using `?release2=6b77a524` also rendered the earlier Release 1 navigation. The missing Release 2 items are therefore not explained by the browser document cache observed during this check.
+
+After an additional 30-second propagation interval, a second cache-busting root request still rendered the earlier Release 1 navigation and retained the live **NGN 29,997.78** open variance view. The public route check did not create or modify any financial or control record. Release 2 route availability and genuine device acceptance must be rechecked after the hosting publication path serves checkpoint `6b77a524` (or a later verified checkpoint).
