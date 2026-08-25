@@ -70,7 +70,9 @@
 - [x] Add targeted router and UI coverage for receipt-extraction policy enable, disable, owner restriction, and fail-closed extraction behavior.
 - [ ] Complete real-device signed-in production acceptance checks for the enhanced dashboard, evidence, exception, and audit flows without submitting a resolution or changing evidence.
 - [ ] Replace the unauthenticated managed-storage redirect with an authenticated, tenant- and branch-scoped receipt-delivery route so possession or discovery of a storage key cannot bypass file access controls.
+- [x] Change the active receipt-preview flow so authenticated `getFile` authorises tenant and branch scope and returns only a short-lived provider-signed URL rather than raw file metadata.
 - [ ] Address legacy raw managed-storage URLs already exposed by the hosting-layer storage endpoint; newly issued controlled previews now use the application’s authenticated API route, but old object URLs require platform-level revocation or object rotation.
 - [x] Compare the supplied revised business thesis and target technical architecture against the current Control Ledger implementation, identifying alignment, gaps, and phased decisions.
 - [x] Compare the newly supplied architecture document with the prior thesis and identify any material additions, contradictions, or roadmap changes.
 - [x] Produce a plain-language, locally grounded business guide explaining Control Ledger’s value, operating logic, market alternatives, differentiation, and user-centred simplification path.
+- [x] Correct the shared sign-in dialog accessibility warning by always providing an explicit accessible title.
