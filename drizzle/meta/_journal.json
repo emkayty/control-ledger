@@ -50,6 +50,13 @@
       "when": 1787664341432,
       "tag": "0006_cooing_stepford_cuckoos",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787668498120,
+      "tag": "0007_illegal_slapstick",
+      "breakpoints": true
     }
   ]
 }

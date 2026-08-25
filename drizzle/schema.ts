@@ -380,6 +380,228 @@ export const idempotencyKeys = mysqlTable(
   ],
 );
 
+export const products = mysqlTable(
+  "products",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    sku: varchar("sku", { length: 96 }).notNull(),
+    name: varchar("name", { length: 180 }).notNull(),
+    unitOfMeasure: varchar("unitOfMeasure", { length: 32 }).notNull().default("unit"),
+    reorderPointQuantity: decimal("reorderPointQuantity", { precision: 20, scale: 3 }).notNull().default("0"),
+    isActive: int("isActive").notNull().default(1),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("product_org_sku_unique").on(table.organisationId, table.sku),
+    index("product_scope_active_index").on(table.organisationId, table.branchId, table.isActive),
+  ],
+);
+
+export const stockLots = mysqlTable(
+  "stockLots",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    productId: varchar("productId", { length: 36 }).notNull(),
+    batchCode: varchar("batchCode", { length: 96 }).notNull(),
+    expiryAt: timestamp("expiryAt"),
+    status: mysqlEnum("status", ["active", "quarantined", "exhausted", "expired"]).notNull().default("active"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("stock_lot_scope_batch_unique").on(table.organisationId, table.branchId, table.productId, table.batchCode),
+    index("stock_lot_scope_expiry_index").on(table.organisationId, table.branchId, table.productId, table.expiryAt),
+  ],
+);
+
+export const customerOrders = mysqlTable(
+  "customerOrders",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    customerId: varchar("customerId", { length: 36 }).notNull(),
+    orderNumber: varchar("orderNumber", { length: 96 }).notNull(),
+    status: mysqlEnum("status", ["draft", "confirmed", "delivered", "invoiced", "cancelled"]).notNull().default("draft"),
+    orderedAt: timestamp("orderedAt").defaultNow().notNull(),
+    expectedDeliveryAt: timestamp("expectedDeliveryAt"),
+    note: varchar("note", { length: 500 }),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("customer_order_org_number_unique").on(table.organisationId, table.orderNumber),
+    index("customer_order_scope_status_index").on(table.organisationId, table.branchId, table.status, table.orderedAt),
+    index("customer_order_customer_index").on(table.customerId),
+  ],
+);
+
+export const customerOrderLines = mysqlTable(
+  "customerOrderLines",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    orderId: varchar("orderId", { length: 36 }).notNull(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    productId: varchar("productId", { length: 36 }).notNull(),
+    quantity: decimal("quantity", { precision: 20, scale: 3 }).notNull(),
+    unitPriceMinor: decimal("unitPriceMinor", { precision: 20, scale: 0 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("customer_order_line_order_index").on(table.orderId), index("customer_order_line_product_index").on(table.productId)],
+);
+
+export const deliveries = mysqlTable(
+  "deliveries",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    orderId: varchar("orderId", { length: 36 }).notNull(),
+    deliveryNumber: varchar("deliveryNumber", { length: 96 }).notNull(),
+    status: mysqlEnum("status", ["recorded", "confirmed", "cancelled"]).notNull().default("recorded"),
+    deliveredAt: timestamp("deliveredAt").notNull(),
+    recipientName: varchar("recipientName", { length: 180 }),
+    note: varchar("note", { length: 500 }),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("delivery_org_number_unique").on(table.organisationId, table.deliveryNumber),
+    index("delivery_scope_status_index").on(table.organisationId, table.branchId, table.status, table.deliveredAt),
+    index("delivery_order_index").on(table.orderId),
+  ],
+);
+
+export const deliveryLines = mysqlTable(
+  "deliveryLines",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    deliveryId: varchar("deliveryId", { length: 36 }).notNull(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    productId: varchar("productId", { length: 36 }).notNull(),
+    stockLotId: varchar("stockLotId", { length: 36 }),
+    quantity: decimal("quantity", { precision: 20, scale: 3 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("delivery_line_delivery_index").on(table.deliveryId), index("delivery_line_product_index").on(table.productId)],
+);
+
+export const invoices = mysqlTable(
+  "invoices",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    customerId: varchar("customerId", { length: 36 }).notNull(),
+    orderId: varchar("orderId", { length: 36 }).notNull(),
+    deliveryId: varchar("deliveryId", { length: 36 }),
+    obligationId: varchar("obligationId", { length: 36 }).notNull(),
+    invoiceNumber: varchar("invoiceNumber", { length: 96 }).notNull(),
+    status: mysqlEnum("status", ["issued", "cancelled"]).notNull().default("issued"),
+    amountMinor: decimal("amountMinor", { precision: 20, scale: 0 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    issuedAt: timestamp("issuedAt").defaultNow().notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("invoice_org_number_unique").on(table.organisationId, table.invoiceNumber),
+    uniqueIndex("invoice_obligation_unique").on(table.obligationId),
+    index("invoice_scope_status_index").on(table.organisationId, table.branchId, table.status, table.issuedAt),
+    index("invoice_customer_index").on(table.customerId),
+  ],
+);
+
+export const stockMovements = mysqlTable(
+  "stockMovements",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    productId: varchar("productId", { length: 36 }).notNull(),
+    stockLotId: varchar("stockLotId", { length: 36 }),
+    movementType: mysqlEnum("movementType", ["opening", "receipt", "delivery", "transfer_out", "transfer_in", "adjustment"])
+      .notNull(),
+    quantityDelta: decimal("quantityDelta", { precision: 20, scale: 3 }).notNull(),
+    deliveryId: varchar("deliveryId", { length: 36 }),
+    transferReference: varchar("transferReference", { length: 96 }),
+    reason: varchar("reason", { length: 500 }),
+    occurredAt: timestamp("occurredAt").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    index("stock_movement_product_scope_time_index").on(table.organisationId, table.branchId, table.productId, table.occurredAt),
+    index("stock_movement_lot_index").on(table.stockLotId),
+    uniqueIndex("stock_movement_delivery_product_unique").on(table.deliveryId, table.productId),
+  ],
+);
+
+export const collectionFollowUps = mysqlTable(
+  "collectionFollowUps",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    customerId: varchar("customerId", { length: 36 }).notNull(),
+    obligationId: varchar("obligationId", { length: 36 }).notNull(),
+    status: mysqlEnum("status", ["open", "contacted", "promised", "disputed", "closed"]).notNull().default("open"),
+    reason: mysqlEnum("reason", ["partial_payment", "pending_bank", "customer_dispute", "reconciliation_required", "other"]).notNull(),
+    note: text("note").notNull(),
+    nextActionAt: timestamp("nextActionAt"),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("collection_followup_scope_status_index").on(table.organisationId, table.branchId, table.status, table.nextActionAt), index("collection_followup_obligation_index").on(table.obligationId)],
+);
+
+export const evidenceStorageRemediations = mysqlTable(
+  "evidenceStorageRemediations",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    evidenceFileId: varchar("evidenceFileId", { length: 36 }).notNull(),
+    status: mysqlEnum("status", ["identified", "provider_requested", "provider_confirmed"]).notNull().default("identified"),
+    providerReference: varchar("providerReference", { length: 255 }),
+    note: text("note").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("evidence_storage_remediation_file_index").on(table.organisationId, table.branchId, table.evidenceFileId, table.createdAt)],
+);
+
+export const evidenceRetentionReviews = mysqlTable(
+  "evidenceRetentionReviews",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    evidenceFileId: varchar("evidenceFileId", { length: 36 }).notNull(),
+    reviewStatus: mysqlEnum("reviewStatus", ["retained", "review_due", "legal_hold"]).notNull(),
+    retentionUntil: timestamp("retentionUntil"),
+    note: text("note").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("evidence_retention_scope_index").on(table.organisationId, table.branchId, table.evidenceFileId, table.createdAt)],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Organisation = typeof organisations.$inferSelect;

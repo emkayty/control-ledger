@@ -71,8 +71,16 @@
 - [ ] Complete real-device signed-in production acceptance checks for the enhanced dashboard, evidence, exception, and audit flows without submitting a resolution or changing evidence.
 - [ ] Replace the unauthenticated managed-storage redirect with an authenticated, tenant- and branch-scoped receipt-delivery route so possession or discovery of a storage key cannot bypass file access controls.
 - [x] Change the active receipt-preview flow so authenticated `getFile` authorises tenant and branch scope and returns only a short-lived provider-signed URL rather than raw file metadata.
-- [ ] Address legacy raw managed-storage URLs already exposed by the hosting-layer storage endpoint; newly issued controlled previews now use the application’s authenticated API route, but old object URLs require platform-level revocation or object rotation.
+- [ ] Address legacy raw managed-storage URLs already exposed by the hosting-layer storage endpoint; newly issued controlled previews are authorised by protected tRPC before returning a short-lived provider-signed URL without raw storage metadata, but old object URLs require platform-level revocation or object rotation.
 - [x] Compare the supplied revised business thesis and target technical architecture against the current Control Ledger implementation, identifying alignment, gaps, and phased decisions.
 - [x] Compare the newly supplied architecture document with the prior thesis and identify any material additions, contradictions, or roadmap changes.
 - [x] Produce a plain-language, locally grounded business guide explaining Control Ledger’s value, operating logic, market alternatives, differentiation, and user-centred simplification path.
 - [x] Correct the shared sign-in dialog accessibility warning by always providing an explicit accessible title.
+- [x] Define and document the Release 2 scope, safeguards, data model, and acceptance criteria without altering live Release 1 business records.
+- [x] Add a controlled product catalogue, order, delivery, invoice, and collection queue model that links new economic facts without replacing Release 1 receivables or evidence.
+- [x] Add append-oriented inventory movement, branch transfer, batch/expiry, and stock-position controls for FMCG operations.
+- [x] Add customer statements, collection priorities, and clear short-payment reason workflows for day-to-day follow-up.
+- [x] Add a user-centred, mobile-first Release 2 operating workspace with role-specific next actions and plain business language.
+- [x] Add Release 2 privacy, retention, provider-access, and policy governance controls without weakening the existing evidence trail.
+- [x] Add automated Release 2 safety, access, and economic-linkage coverage; verify all existing tests remain passing.
+- [ ] Complete Release 2 desktop/mobile production validation using authorised data only, without settling the live NGN 29,997.78 variance.
