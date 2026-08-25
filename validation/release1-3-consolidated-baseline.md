@@ -27,3 +27,7 @@ The implementation passed TypeScript validation and **24 automated test files / 
 | External financial completeness | Tax, bank/PSP integration, opening balances, inventory valuation, statutory reporting, and external accounting synchronisation require separate verified policy and source data. | Independent design, approved accounting policy, integrations, and operating evidence. |
 
 The external gates do not erase the implemented control baseline. They restrict the claims that can be made about unrestricted production readiness, provider security closure, statutory accounting, and real-world operational acceptance.
+
+## Published-route observation
+
+On 25 August 2026, the configured public domain successfully loaded the authenticated `/ledger` route and its existing application shell. However, the published route still displayed the earlier Ledger interface without the newly saved UTC period fields or Ledger PDF action. The current checkpoint is therefore validated in the authorised development preview, while public propagation of the latest reporting controls remains unverified. No public-page action created or changed a business record.
