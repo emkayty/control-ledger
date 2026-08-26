@@ -19,7 +19,7 @@ const navigation = [
   { href: "/operations", label: "Operations", icon: Warehouse },
   { href: "/collections", label: "Collections", icon: WalletCards },
   { href: "/ledger", label: "Ledger", icon: BookOpenCheck },
-  { href: "/exceptions", label: "Exceptions", icon: AlertTriangle },
+  { href: "/variances", label: "Variances", icon: AlertTriangle },
   { href: "/access", label: "People & access", icon: UsersRound },
   { href: "/audit", label: "Audit trail", icon: History },
 ];

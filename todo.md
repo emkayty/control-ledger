@@ -113,3 +113,6 @@
 - [x] Refine the mobile-first information architecture, compactness, visual hierarchy, empty/error states, and interaction cues for a more professional user-centred experience.
 - [x] Add targeted regression coverage for any business-rule or UX safety gap found during the final review.
 - [x] Run final type, regression, desktop/mobile, and current-checkpoint public-route verification; record an evidence-led readiness position without claiming unresolved external gates are complete. Type, test, preview, and cache-busted public-route checks all pass.
+- [x] Define the dedicated variance-management workspace boundary over the existing append-only exception and approval controls without duplicating or mutating financial facts.
+- [x] Add a scoped, mobile-first Variances workspace with clear queue, investigation, resolution-submission, and independent-decision states.
+- [x] Add focused variance-workspace coverage and verify responsive behaviour without resolving the live NGN 29,997.78 variance.

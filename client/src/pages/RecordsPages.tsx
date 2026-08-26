@@ -2,6 +2,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/StatusPill";
 import { OPayProposal, ReceiptPreviewButton, ReceiptProposalCard } from "@/components/ReceiptProposalCard";
 import { ReceiptExtractionPolicyCard } from "@/components/ReceiptExtractionPolicyCard";
+import { VarianceCaseWorkflow } from "@/components/VarianceCaseWorkflow";
 import { evidenceProposalDefaults } from "@/lib/evidenceProposal";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,11 +20,9 @@ import { canExtractOpayReceipt, isImageReceipt } from "@/lib/receiptView";
 import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
-  CheckCircle2,
   FilePlus2,
   FileText,
   FolderUp,
-  History,
   Image,
   Link2,
   ReceiptText,
@@ -494,60 +493,6 @@ export function EvidencePage() {
   );
 }
 
-function ExceptionResolutionControls({ exception }: { exception: { id: string; status: string; approvalRequired: number; createdByUserId: number } }) {
-  const scope = useControlScope();
-  const utils = trpc.useUtils();
-  const [rationale, setRationale] = useState("");
-  const submit = trpc.control.exceptions.submitResolution.useMutation({
-    onSuccess: () => { toast.success("Resolution recorded."); utils.control.exceptions.list.invalidate(scope); utils.control.dashboard.invalidate(scope); },
-    onError: error => toast.error(error.message),
-  });
-  const approve = trpc.control.exceptions.approveResolution.useMutation({
-    onSuccess: result => { toast.success(result.status === "resolved" ? "Resolution approved." : "Exception returned for review."); utils.control.exceptions.list.invalidate(scope); utils.control.dashboard.invalidate(scope); },
-    onError: error => toast.error(error.message),
-  });
-  if (["resolved", "rejected"].includes(exception.status)) return <div className="mt-5 flex items-center gap-2 border-t pt-4 text-xs font-bold text-emerald-700"><ShieldCheck className="size-4" />Resolution history retained in the audit trail.</div>;
-  if (exception.status === "pending_approval" && ["owner", "controller", "approver"].includes(scope.role)) return <div className="mt-5 space-y-2 border-t pt-4"><p className="text-xs font-extrabold text-slate-700">Independent approval decision</p><div className="flex flex-col gap-2 sm:flex-row"><Input value={rationale} onChange={event => setRationale(event.target.value)} required minLength={4} placeholder="Record the approval or return rationale" /><Button disabled={approve.isPending || rationale.trim().length < 4} onClick={() => approve.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, approve: true, rationale: rationale.trim() })} className="rounded-xl bg-teal-700 hover:bg-teal-800"><CheckCircle2 className="mr-2 size-4" />Approve</Button><Button disabled={approve.isPending || rationale.trim().length < 4} variant="outline" onClick={() => approve.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, approve: false, rationale: rationale.trim() })} className="rounded-xl">Return</Button></div></div>;
-  return <form className="mt-5 flex flex-col gap-2 border-t pt-4 sm:flex-row" onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); submit.mutate({ organisationId: scope.organisationId, exceptionId: exception.id, note: String(data.get("note")) }); }}><Input name="note" required minLength={4} placeholder="Record the proposed resolution and investigation basis" /><Button type="submit" disabled={submit.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">Submit for approval</Button></form>;
-}
-
-function ApprovalHistory({ exceptionId }: { exceptionId: string }) {
-  const scope = useControlScope();
-  const history = trpc.control.exceptions.approvalHistory.useQuery({ organisationId: scope.organisationId, exceptionId });
-  if (history.isLoading) return null;
-  if (history.isError) return <p className="mt-3 text-xs text-rose-700">Approval history could not load: {history.error.message}</p>;
-  if (!history.data?.length) return null;
-  return <section className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/50 p-4"><div className="flex items-center gap-2"><History className="size-4 text-violet-700" /><p className="text-xs font-extrabold text-violet-900">Approval decision trail</p></div><div className="mt-3 space-y-2">{history.data.map(item => <div key={item.id} className="rounded-xl bg-white/80 p-3"><p className="text-xs font-extrabold capitalize text-slate-800">{item.decision} <span className="font-medium text-muted-foreground">· {item.actorName ?? "Authorised user"}</span></p><p className="mt-1 text-xs leading-5 text-slate-700">{item.rationale}</p><p className="mt-2 font-mono text-[10px] text-muted-foreground">{new Date(item.createdAt).toLocaleString()} · {item.correlationId.slice(0, 10)}…</p></div>)}</div></section>;
-}
-
-function ExceptionNotes({ exceptionId }: { exceptionId: string }) {
-  const scope = useControlScope();
-  const utils = trpc.useUtils();
-  const notes = trpc.control.exceptions.notes.useQuery({ organisationId: scope.organisationId, exceptionId });
-  const addNote = trpc.control.exceptions.addNote.useMutation({
-    onSuccess: () => {
-      toast.success("Investigation note added.");
-      utils.control.exceptions.notes.invalidate({ organisationId: scope.organisationId, exceptionId });
-    },
-    onError: error => toast.error(error.message),
-  });
-
-  return (
-    <details className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
-      <summary className="cursor-pointer text-xs font-extrabold text-slate-700">Investigation notes {notes.data?.length ? `(${notes.data.length})` : ""}</summary>
-      <div className="mt-3 space-y-3">
-        {notes.isLoading ? <p className="text-xs text-muted-foreground">Loading note history…</p> : null}
-        {notes.isError ? <p className="text-xs text-rose-700">{notes.error.message}</p> : null}
-        {notes.data?.length ? notes.data.map(note => <div key={note.id} className="rounded-xl border bg-white p-3"><p className="text-xs leading-5 text-slate-700">{note.body}</p><p className="mt-2 font-mono text-[10px] text-muted-foreground">{new Date(note.createdAt).toLocaleString()} · {note.correlationId.slice(0, 10)}…</p></div>) : <p className="text-xs text-muted-foreground">No investigation notes have been recorded.</p>}
-        <form className="flex flex-col gap-2 pt-1 sm:flex-row" onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); addNote.mutate({ organisationId: scope.organisationId, exceptionId, body: String(data.get("note")) }); event.currentTarget.reset(); }}>
-          <Input name="note" required minLength={2} placeholder="Add an investigation note" />
-          <Button type="submit" size="sm" variant="outline" disabled={addNote.isPending} className="rounded-xl">Add note</Button>
-        </form>
-      </div>
-    </details>
-  );
-}
-
 export function ExceptionsPage() {
   const scope = useControlScope();
   const exceptions = trpc.control.exceptions.list.useQuery(scope);
@@ -564,9 +509,7 @@ export function ExceptionsPage() {
                 <div className="flex gap-4"><div className={`grid size-10 shrink-0 place-items-center rounded-xl ${item.severity === "critical" || item.severity === "high" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}><AlertTriangle className="size-5" /></div><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-extrabold">{item.title}</h2><StatusPill status={item.status} /></div><p className="mt-2 text-xs leading-5 text-muted-foreground">{item.type.replaceAll("_", " ")} · {item.dueAt ? `due ${new Date(item.dueAt).toLocaleString()}` : "due date not set"} · severity {item.severity}</p>{item.resolutionNote ? <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700">{item.resolutionNote}</p> : null}</div></div>
                 <div className="sm:text-right"><p className="money text-base font-medium">{formatMoney(item.valueImpactMinor, item.currency ?? "NGN")}</p><p className="mt-1 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">value impact</p></div>
               </div>
-              <ExceptionResolutionControls exception={item} />
-              <ApprovalHistory exceptionId={item.id} />
-              <ExceptionNotes exceptionId={item.id} />
+              <VarianceCaseWorkflow exception={item} />
             </article>
           ))}
         </div>
