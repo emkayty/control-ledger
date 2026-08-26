@@ -15,6 +15,8 @@ export const permissions = {
   approve: ["owner", "controller", "approver"],
   manageMemberships: ["owner", "controller"],
   manageReceiptExtraction: ["owner"],
+  manageVarianceAiAssistance: ["owner"],
+  requestVarianceAiAssistance: ["owner", "controller", "manager"],
   manageProducts: ["owner", "controller", "manager"],
   manageOrders: ["owner", "controller", "operator", "manager"],
   manageInventory: ["owner", "controller", "manager"],

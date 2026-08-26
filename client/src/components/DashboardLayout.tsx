@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { ControlScopeProvider } from "@/contexts/ControlScopeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { ControlScope } from "@/lib/control";
 import { trpc } from "@/lib/trpc";
 import { AlertTriangle, ArrowUpRight, BookOpenCheck, Building2, CircleUserRound, FileCheck2, History, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, Sparkles, UsersRound, Warehouse, WalletCards } from "lucide-react";
@@ -12,20 +13,12 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Skeleton } from "./ui/skeleton";
 import { toast } from "sonner";
 
-const navigation = [
-  { href: "/", label: "Control desk", icon: LayoutDashboard },
-  { href: "/receivables", label: "Receivables", icon: ReceiptText },
-  { href: "/evidence", label: "Evidence intake", icon: FileCheck2 },
-  { href: "/operations", label: "Operations", icon: Warehouse },
-  { href: "/collections", label: "Collections", icon: WalletCards },
-  { href: "/ledger", label: "Ledger", icon: BookOpenCheck },
-  { href: "/variances", label: "Variances", icon: AlertTriangle },
-  { href: "/access", label: "People & access", icon: UsersRound },
-  { href: "/audit", label: "Audit trail", icon: History },
-];
-
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
+  const { t } = useLanguage();
+  const navigation = [
+    { href: "/", label: t("controlDesk"), icon: LayoutDashboard }, { href: "/receivables", label: t("receivables"), icon: ReceiptText }, { href: "/evidence", label: t("evidenceIntake"), icon: FileCheck2 }, { href: "/operations", label: t("operations"), icon: Warehouse }, { href: "/collections", label: t("collections"), icon: WalletCards }, { href: "/ledger", label: t("ledger"), icon: BookOpenCheck }, { href: "/variances", label: t("variances"), icon: AlertTriangle }, { href: "/access", label: t("peopleAccess"), icon: UsersRound }, { href: "/audit", label: t("auditTrail"), icon: History },
+  ];
   return <nav className="space-y-1 px-3 py-4" aria-label="Primary navigation">
     {navigation.map(item => {
       const Icon = item.icon; const active = location === item.href;
@@ -36,7 +29,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   </nav>;
 }
 
-function Brand() { return <div className="flex items-center gap-3 px-5 py-6"><div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-teal-200 to-cyan-400 text-slate-950 shadow-lg shadow-cyan-900/30"><ShieldCheck className="size-5" /></div><div><p className="text-sm font-extrabold tracking-tight text-white">Control Ledger</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-teal-200/70">Operations control</p></div></div>; }
+function Brand() { const { t } = useLanguage(); return <div className="flex items-center gap-3 px-5 py-6"><div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-teal-200 to-cyan-400 text-slate-950 shadow-lg shadow-cyan-900/30"><ShieldCheck className="size-5" /></div><div><p className="text-sm font-extrabold tracking-tight text-white">Control Ledger</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-teal-200/70">{t("operationsControl")}</p></div></div>; }
 
 function WorkspaceSetup() {
   const [organisationName, setOrganisationName] = useState("");
@@ -51,6 +44,7 @@ function WorkspaceSetup() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const workspaceQuery = trpc.control.workspace.list.useQuery(undefined, { enabled: Boolean(user) });
   const [selectedOrganisationId, setSelectedOrganisationId] = useState("");
   const [selectedBranchId, setSelectedBranchId] = useState("");
@@ -70,7 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const scope: ControlScope = { organisationId: selectedOrganisation, branchId: selectedBranch, organisationName: membership.organisationName, branchName: availableBranches.find(branch => branch.id === selectedBranch)?.name ?? "Branch", role: membership.role };
   return <ControlScopeProvider scope={scope}><div className="min-h-screen bg-[#f6faf9] lg:flex">
     <aside className="hidden min-h-screen w-64 shrink-0 bg-[#071d22] lg:block"><Brand /><Navigation /><div className="absolute bottom-5 w-64 px-4"><div className="rounded-2xl border border-white/8 bg-white/5 p-3 text-xs text-slate-300"><p className="font-extrabold text-white">Immutable by default</p><p className="mt-1 leading-5">Every material action carries an actor and correlation trail.</p></div></div></aside>
-    <div className="min-w-0 flex flex-1 flex-col"><header className="sticky top-0 z-30 border-b border-slate-200/80 bg-[#f6faf9]/92 backdrop-blur-xl"><div className="flex h-[72px] items-center gap-3 px-4 sm:px-6"><Sheet><SheetTrigger asChild><Button variant="outline" size="icon" className="rounded-xl lg:hidden"><Menu className="size-5" /><span className="sr-only">Open navigation</span></Button></SheetTrigger><SheetContent side="left" className="w-72 border-0 bg-[#071d22] p-0 text-white"><Brand /><Navigation /></SheetContent></Sheet><div className="min-w-0 flex-1"><p className="hidden text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground sm:block">Scoped workspace</p><div className="flex items-center gap-2"><Building2 className="size-4 text-teal-700" /><span className="truncate text-sm font-extrabold">{scope.organisationName}</span></div></div><div className="hidden items-center gap-2 md:flex"><select value={selectedOrganisation} onChange={event => { setSelectedOrganisationId(event.target.value); setSelectedBranchId(""); }} className="h-10 max-w-44 rounded-xl border bg-white px-3 text-xs font-bold outline-none"><option value={selectedOrganisation}>{scope.organisationName}</option></select><select value={selectedBranch} onChange={event => setSelectedBranchId(event.target.value)} className="h-10 max-w-40 rounded-xl border bg-white px-3 text-xs font-bold outline-none">{availableBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div><div className="flex items-center gap-2 rounded-xl border bg-white py-1.5 pl-2 pr-3"><div className="grid size-7 place-items-center rounded-lg bg-slate-100 text-slate-600"><CircleUserRound className="size-4" /></div><div className="hidden max-w-32 sm:block"><p className="truncate text-xs font-extrabold">{user.name ?? "Account"}</p><p className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{scope.role}</p></div><button onClick={logout} className="ml-1 text-muted-foreground hover:text-rose-600" aria-label="Sign out"><LogOut className="size-4" /></button></div></div></header>
+    <div className="min-w-0 flex flex-1 flex-col"><header className="sticky top-0 z-30 border-b border-slate-200/80 bg-[#f6faf9]/92 backdrop-blur-xl"><div className="flex h-[72px] items-center gap-3 px-4 sm:px-6"><Sheet><SheetTrigger asChild><Button variant="outline" size="icon" className="rounded-xl lg:hidden"><Menu className="size-5" /><span className="sr-only">Open navigation</span></Button></SheetTrigger><SheetContent side="left" className="w-72 border-0 bg-[#071d22] p-0 text-white"><Brand /><Navigation /></SheetContent></Sheet><div className="min-w-0 flex-1"><p className="hidden text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground sm:block">{t("scopedWorkspace")}</p><div className="flex items-center gap-2"><Building2 className="size-4 text-teal-700" /><span className="truncate text-sm font-extrabold">{scope.organisationName}</span></div></div><div className="hidden items-center gap-2 md:flex"><select value={selectedOrganisation} onChange={event => { setSelectedOrganisationId(event.target.value); setSelectedBranchId(""); }} className="h-10 max-w-44 rounded-xl border bg-white px-3 text-xs font-bold outline-none"><option value={selectedOrganisation}>{scope.organisationName}</option></select><select value={selectedBranch} onChange={event => setSelectedBranchId(event.target.value)} className="h-10 max-w-40 rounded-xl border bg-white px-3 text-xs font-bold outline-none">{availableBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div><select aria-label={t("language")} value={language} onChange={event => setLanguage(event.target.value as "en" | "ha")} className="h-9 rounded-xl border bg-white px-2 text-[11px] font-bold outline-none"><option value="en">{t("english")}</option><option value="ha">{t("hausa")}</option></select><div className="flex items-center gap-2 rounded-xl border bg-white py-1.5 pl-2 pr-3"><div className="grid size-7 place-items-center rounded-lg bg-slate-100 text-slate-600"><CircleUserRound className="size-4" /></div><div className="hidden max-w-32 sm:block"><p className="truncate text-xs font-extrabold">{user.name ?? "Account"}</p><p className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{scope.role}</p></div><button onClick={logout} className="ml-1 text-muted-foreground hover:text-rose-600" aria-label={t("signOut")}><LogOut className="size-4" /></button></div></div></header>
       <main className="surface-grid flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       <footer className="border-t border-slate-200/80 bg-[#f6faf9] px-4 py-4 text-center text-xs font-semibold tracking-wide text-slate-500 sm:px-6">Developed Ace Technologies</footer>
     </div>

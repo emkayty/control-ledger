@@ -31,6 +31,9 @@ export const organisations = mysqlTable("organisations", {
   receiptExtractionEnabled: int("receiptExtractionEnabled").notNull().default(0),
   receiptExtractionPolicyAcceptedAt: timestamp("receiptExtractionPolicyAcceptedAt"),
   receiptExtractionPolicyAcceptedByUserId: int("receiptExtractionPolicyAcceptedByUserId"),
+  varianceAiAssistanceEnabled: int("varianceAiAssistanceEnabled").notNull().default(0),
+  varianceAiAssistancePolicyAcceptedAt: timestamp("varianceAiAssistancePolicyAcceptedAt"),
+  varianceAiAssistancePolicyAcceptedByUserId: int("varianceAiAssistancePolicyAcceptedByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   createdByUserId: int("createdByUserId").notNull(),
 });
@@ -316,6 +319,30 @@ export const receiptExtractionProposals = mysqlTable(
     createdByUserId: int("createdByUserId").notNull(),
   },
   table => [index("receipt_extraction_file_index").on(table.organisationId, table.branchId, table.evidenceFileId, table.createdAt)],
+);
+
+/**
+ * Append-only, human-review-only AI assistance for a control exception.
+ * The proposal never changes the related exception, evidence, reconciliation, or ledger records.
+ */
+export const varianceAiSuggestions = mysqlTable(
+  "varianceAiSuggestions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    exceptionId: varchar("exceptionId", { length: 36 }).notNull(),
+    model: varchar("model", { length: 96 }).notNull(),
+    confidence: mysqlEnum("confidence", ["low", "medium", "high"]).notNull(),
+    inputHash: varchar("inputHash", { length: 128 }).notNull(),
+    proposal: json("proposal").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    index("variance_ai_suggestion_exception_index").on(table.organisationId, table.branchId, table.exceptionId, table.createdAt),
+  ],
 );
 
 export const integrationIntakeRecords = mysqlTable(
