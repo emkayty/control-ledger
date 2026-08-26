@@ -164,6 +164,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   });
   useEffect(() => {
     try { window.localStorage.setItem(languageStorageKey, language); } catch { /* Browser storage may be unavailable. */ }
+    document.documentElement.lang = language;
   }, [language]);
   const value = useMemo(() => ({ language, setLanguage, t: (key: TranslationKey) => copy[language][key] }), [language]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

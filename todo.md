@@ -121,3 +121,6 @@
 - [x] Add protected, scoped AI suggestions for potential discrepancy causes and matching entries that remain proposals only and are audit-recorded.
 - [x] Add a user-selectable Hausa localisation framework and review key control, evidence, variance, and decision terminology for clarity and accuracy.
 - [x] Test the AI proposal boundary and Hausa language selection, then verify responsive public behaviour without resolving any live variance.
+- [x] Audit public-facing metadata, deployment artefacts, repository hygiene, generated files, and project configuration for non-destructive sanitation opportunities.
+- [x] Apply verified, non-destructive sanitation fixes that remove unintended public/project residue without altering business records, audit history, policies, or governed workflows.
+- [ ] Re-run validation and cache-busted public checks; document the sanitation outcome, publish it, and synchronise the private GitHub mirror.

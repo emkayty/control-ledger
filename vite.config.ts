@@ -13,6 +13,7 @@ import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 const PROJECT_ROOT = import.meta.dirname;
 const LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
+const DEBUG_COLLECTOR_PATH = path.join(PROJECT_ROOT, "tooling", "manus-debug-collector.js");
 const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024; // 1MB per log file
 const TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6); // Trim to 60% to avoid constant re-trimming
 
@@ -75,11 +76,16 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
  * - Auto-trimmed when exceeding 1MB (keeps newest entries)
  */
 function vitePluginManusDebugCollector(): Plugin {
+  let isDevelopmentServer = false;
   return {
     name: "manus-debug-collector",
 
+    configResolved(config) {
+      isDevelopmentServer = config.command === "serve";
+    },
+
     transformIndexHtml(html) {
-      if (process.env.NODE_ENV === "production") {
+      if (!isDevelopmentServer) {
         return html;
       }
       return {
@@ -98,6 +104,17 @@ function vitePluginManusDebugCollector(): Plugin {
     },
 
     configureServer(server: ViteDevServer) {
+      server.middlewares.use("/__manus__/debug-collector.js", (req, res, next) => {
+        if (req.method !== "GET") return next();
+        try {
+          res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "no-store" });
+          res.end(fs.readFileSync(DEBUG_COLLECTOR_PATH, "utf-8"));
+        } catch {
+          res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Development diagnostics helper unavailable.");
+        }
+      });
+
       // POST /__manus__/logs: Browser sends logs (written directly to files)
       server.middlewares.use("/__manus__/logs", (req, res, next) => {
         if (req.method !== "POST") {

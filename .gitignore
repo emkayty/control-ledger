@@ -9,6 +9,8 @@ build/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
@@ -31,6 +33,7 @@ ehthumbs.db
 Thumbs.db
 
 # Logs
+.manus-logs/
 logs
 *.log
 npm-debug.log*

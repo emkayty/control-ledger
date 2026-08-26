@@ -17,5 +17,6 @@ describe("language preference", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hausa" }));
     expect(screen.getByText("Cibiyar bambanci")).toBeTruthy();
     expect(window.localStorage.getItem("control-ledger.language")).toBe("ha");
+    expect(document.documentElement.lang).toBe("ha");
   });
 });
