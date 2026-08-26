@@ -116,3 +116,4 @@
 - [x] Define the dedicated variance-management workspace boundary over the existing append-only exception and approval controls without duplicating or mutating financial facts.
 - [x] Add a scoped, mobile-first Variances workspace with clear queue, investigation, resolution-submission, and independent-decision states.
 - [x] Add focused variance-workspace coverage and verify responsive behaviour without resolving the live NGN 29,997.78 variance.
+- [x] Verify public propagation of the dedicated Variances route before treating the current queue, investigation, and decision workspace as live for users.
