@@ -120,4 +120,4 @@
 - [x] Define and document AI variance-assistance boundaries, data minimisation, human-review requirements, and non-settlement safeguards.
 - [x] Add protected, scoped AI suggestions for potential discrepancy causes and matching entries that remain proposals only and are audit-recorded.
 - [x] Add a user-selectable Hausa localisation framework and review key control, evidence, variance, and decision terminology for clarity and accuracy.
-- [ ] Test the AI proposal boundary and Hausa language selection, then verify responsive public behaviour without resolving any live variance.
+- [x] Test the AI proposal boundary and Hausa language selection, then verify responsive public behaviour without resolving any live variance.

@@ -38,4 +38,10 @@ Desktop and 375 px mobile preview checks completed for the dashboard and `/varia
 
 The live database was checked after implementation. The organisation’s AI-assistance policy remains disabled with no acceptance timestamp. The existing exception `8338df03-8947-4623-a1e8-b1d75c14a42f` remains **open**, retains its exact `2999778` NGN minor-unit impact, has no resolution timestamp, and has **zero** AI suggestion rows. No model call was made against live business data during this implementation.
 
+## Public propagation observation
+
+The first cache-busted authenticated public check at `2026-08-26 22:50 GMT+1` loaded the existing Variance centre and preserved the open NGN 29,997.78 case, but did **not** yet show the language selector or the AI investigation card. A second cache-busted check at `22:52 GMT+1`, after a 45-second propagation interval and a deployment-success notice, still served the earlier authenticated Variance-centre bundle. This was recorded as public propagation delay rather than feature verification.
+
+The third cache-busted authenticated public check at `22:54 GMT+1` successfully loaded the current release. It showed the **English/Hausa language selector**, the **disabled-by-default AI investigation assistant**, the processing notice, the clear "AI suggestion only" boundary, and an empty suggestion history. It also showed the unchanged **open NGN 29,997.78** case and the separate human decision controls. No AI-policy enablement, analysis request, investigation note, resolution proposal, approval, settlement, or other financial action was submitted during public verification.
+
 > **Acceptance boundary:** This check validates code, protected contracts, preview rendering, and the additive schema. It does not replace genuine signed-in user acceptance, an owner’s meaningful decision to enable AI processing, or the existing external provider-object remediation gate.
