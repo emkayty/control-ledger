@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderVarianceCandidates, parseVarianceAiProposalResponse } from "./varianceAssistant";
+import { hasConfirmedVarianceAiEnablement, orderVarianceCandidates, parseVarianceAiProposalResponse, varianceAiEnablementConfirmation } from "./varianceAssistant";
 
 describe("variance AI proposal safeguards", () => {
   it("accepts bounded structured output and strips model references that are not in the server candidate set", () => {
@@ -24,5 +24,11 @@ describe("variance AI proposal safeguards", () => {
       { candidateKey: "R1", kind: "receivable" as const, reference: "INV-1", status: "open", amountMinor: "9007199254740993", currency: "NGN", occurredAt: null },
     ], "9007199254740993");
     expect(ordered.map(candidate => candidate.candidateKey)).toEqual(["R1", "E1"]);
+  });
+
+  it("requires the exact owner re-enablement confirmation while tolerating surrounding whitespace", () => {
+    expect(hasConfirmedVarianceAiEnablement(`  ${varianceAiEnablementConfirmation}  `)).toBe(true);
+    expect(hasConfirmedVarianceAiEnablement("enable ai")).toBe(false);
+    expect(hasConfirmedVarianceAiEnablement("ENABLE VARIANCE-AI")).toBe(false);
   });
 });

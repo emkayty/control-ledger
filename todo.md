@@ -124,3 +124,6 @@
 - [x] Audit public-facing metadata, deployment artefacts, repository hygiene, generated files, and project configuration for non-destructive sanitation opportunities.
 - [x] Apply verified, non-destructive sanitation fixes that remove unintended public/project residue without altering business records, audit history, policies, or governed workflows.
 - [x] Re-run validation and cache-busted public checks; document the sanitation outcome, publish it, and synchronise the private GitHub mirror.
+- [x] Audit the current disabled AI variance-assistance policy, consent record, rate bounds, data-minimisation boundary, and owner activation path.
+- [x] Strengthen safe owner-only AI re-enablement safeguards without enabling live AI processing silently or mutating any business control record.
+- [ ] Simplify the Variance-centre AI policy interface for focused reading and complete validation, public verification, documentation, and GitHub synchronisation.

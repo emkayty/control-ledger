@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const varianceAiProcessingNoticeVersion = "2026-08-26";
+export const varianceAiEnablementConfirmation = "ENABLE VARIANCE AI";
+export const varianceAiDailyAnalysisLimit = 3;
+
+export function hasConfirmedVarianceAiEnablement(value: string) {
+  return value.trim().toLocaleUpperCase() === varianceAiEnablementConfirmation;
+}
+
 export const varianceAiConfidenceSchema = z.enum(["low", "medium", "high"]);
 
 export const varianceAiProposalSchema = z.object({

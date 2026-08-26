@@ -62,7 +62,7 @@ describe("protected AI variance assistance", () => {
     const { db, inserts, updates } = database([
       [openException], [ownerMembership], [{ id: branchId }], [{ enabled: 1, acceptedAt: new Date() }], [],
       [{ id: "right", branchId, reference: "INV-RIGHT", amountMinor: "3000000", currency: "NGN", status: "open", dueAt: null }, { id: "wrong", branchId: otherBranchId, reference: "INV-WRONG", amountMinor: "2999778", currency: "NGN", status: "open", dueAt: null }],
-      [],
+      [{ id: "evidence-right", branchId, sourceReference: "OP-001", kind: "payment_observation", amountMinor: "3000000", currency: "NGN", status: "recorded", sourceName: "Sensitive source label", occurredAt: null }],
     ]);
     getDbMock.mockResolvedValue(db);
 
@@ -71,7 +71,9 @@ describe("protected AI variance assistance", () => {
     expect(result.replayed).toBe(false);
     const modelInput = String(invokeLLMMock.mock.calls[0]?.[0]?.messages?.[1]?.content);
     expect(modelInput).toContain("INV-RIGHT");
+    expect(modelInput).toContain("OP-001");
     expect(modelInput).not.toContain("INV-WRONG");
+    expect(modelInput).not.toContain("Sensitive source label");
     expect(inserts.some(record => record.model === "gpt-5-mini" && record.exceptionId === exceptionId && record.proposal !== undefined)).toBe(true);
     expect(inserts.some(record => record.action === "variance_ai.suggestion_proposed")).toBe(true);
     expect(updates).toEqual([expect.objectContaining({ responseMetadata: expect.any(Object) })]);
@@ -81,12 +83,31 @@ describe("protected AI variance assistance", () => {
   it("allows only an owner to enable the processing policy and writes the policy change with its audit event inside the controlled workflow", async () => {
     const rejected = database([[{ ...ownerMembership, role: "controller" }]]);
     getDbMock.mockResolvedValue(rejected.db);
-    await expect(appRouter.createCaller(context()).varianceAi.policy.configure({ organisationId, branchId, enabled: true, acceptProcessingNotice: true, idempotencyKey: "variance-policy-denied-01" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(appRouter.createCaller(context()).varianceAi.policy.configure({ organisationId, branchId, enabled: true, acceptProcessingNotice: true, confirmation: "ENABLE VARIANCE AI", idempotencyKey: "variance-policy-denied-01" })).rejects.toMatchObject({ code: "FORBIDDEN" });
 
-    const { db, inserts, updates } = database([[ownerMembership], [{ id: branchId }], []]);
+    const { db, inserts, updates } = database([[ownerMembership], [{ id: branchId }], [{ enabled: 0 }], []]);
     getDbMock.mockResolvedValue(db);
-    await expect(appRouter.createCaller(context()).varianceAi.policy.configure({ organisationId, branchId, enabled: true, acceptProcessingNotice: true, idempotencyKey: "variance-policy-owner-01" })).resolves.toMatchObject({ replayed: false });
+    await expect(appRouter.createCaller(context()).varianceAi.policy.configure({ organisationId, branchId, enabled: true, acceptProcessingNotice: true, confirmation: "ENABLE VARIANCE AI", idempotencyKey: "variance-policy-owner-01" })).resolves.toMatchObject({ replayed: false });
     expect(updates).toEqual(expect.arrayContaining([expect.objectContaining({ varianceAiAssistanceEnabled: 1 }), expect.objectContaining({ responseMetadata: expect.any(Object) })]));
-    expect(inserts.some(record => record.action === "variance_ai.policy_enabled" && record.metadata !== undefined)).toBe(true);
+    expect(inserts).toContainEqual(expect.objectContaining({ action: "variance_ai.policy_enabled", metadata: expect.objectContaining({ activationConfirmation: "owner_typed", noticeVersion: "2026-08-26" }) }));
+  });
+
+  it("requires the typed confirmation before an owner can enable the policy", async () => {
+    const { db, updates } = database([[ownerMembership], [{ id: branchId }]]);
+    getDbMock.mockResolvedValue(db);
+
+    await expect(appRouter.createCaller(context()).varianceAi.policy.configure({ organisationId, branchId, enabled: true, acceptProcessingNotice: true, confirmation: "ENABLE AI", idempotencyKey: "variance-policy-confirmation-01" })).rejects.toThrow("Type the displayed confirmation exactly");
+    expect(updates).toEqual([]);
+  });
+
+  it("enforces the per-case 24-hour analysis budget before model invocation", async () => {
+    const { db } = database([
+      [openException], [ownerMembership], [{ id: branchId }], [{ enabled: 1, acceptedAt: new Date() }], [], [], [],
+      [{ id: "recent-1" }, { id: "recent-2" }, { id: "recent-3" }],
+    ]);
+    getDbMock.mockResolvedValue(db);
+
+    await expect(appRouter.createCaller(context()).varianceAi.suggestions.analyse({ organisationId, exceptionId, idempotencyKey: "variance-budget-01" })).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    expect(invokeLLMMock).not.toHaveBeenCalled();
   });
 });

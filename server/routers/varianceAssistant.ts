@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditEvents,
@@ -13,7 +13,7 @@ import {
   users,
   varianceAiSuggestions,
 } from "../../drizzle/schema";
-import { orderVarianceCandidates, parseVarianceAiProposalResponse, type VarianceCandidate } from "../control/varianceAssistant";
+import { hasConfirmedVarianceAiEnablement, orderVarianceCandidates, parseVarianceAiProposalResponse, type VarianceCandidate, varianceAiDailyAnalysisLimit, varianceAiProcessingNoticeVersion } from "../control/varianceAssistant";
 import { permissions, requireScopedMembership } from "../control/access";
 import { getDb } from "../db";
 import { invokeLLM, listLLMModels } from "../_core/llm";
@@ -76,7 +76,6 @@ function compactCandidate(candidate: VarianceCandidate) {
     amountMinor: candidate.amountMinor,
     currency: candidate.currency,
     occurredAt: candidate.occurredAt,
-    ...(candidate.sourceName ? { sourceName: candidate.sourceName } : {}),
   };
 }
 
@@ -119,17 +118,21 @@ export const varianceAssistantRouter = router({
       const db = await requireActiveScope({ ...input, userId: ctx.user.id, allowed: permissions.read });
       const [policy] = await db.select({ enabled: organisations.varianceAiAssistanceEnabled, acceptedAt: organisations.varianceAiAssistancePolicyAcceptedAt, acceptedBy: users.name }).from(organisations).leftJoin(users, eq(users.id, organisations.varianceAiAssistancePolicyAcceptedByUserId)).where(eq(organisations.id, input.organisationId)).limit(1);
       if (!policy) throw new TRPCError({ code: "NOT_FOUND", message: "Organisation not found." });
-      return { enabled: policy.enabled === 1, acceptedAt: policy.acceptedAt, acceptedBy: policy.acceptedBy };
+      return { enabled: policy.enabled === 1, acceptedAt: policy.acceptedAt, acceptedBy: policy.acceptedBy, noticeVersion: varianceAiProcessingNoticeVersion, dailyAnalysisLimit: varianceAiDailyAnalysisLimit };
     }),
-    configure: protectedProcedure.input(scopeInput.extend({ enabled: z.boolean(), acceptProcessingNotice: z.boolean(), idempotencyKey: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+    configure: protectedProcedure.input(scopeInput.extend({ enabled: z.boolean(), acceptProcessingNotice: z.boolean(), confirmation: z.string().trim().max(80), idempotencyKey: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
       const db = await requireActiveScope({ ...input, userId: ctx.user.id, allowed: permissions.manageVarianceAiAssistance });
       if (input.enabled && !input.acceptProcessingNotice) throw new TRPCError({ code: "BAD_REQUEST", message: "An owner must acknowledge the variance-AI processing notice before enabling assistance." });
+      if (input.enabled && !hasConfirmedVarianceAiEnablement(input.confirmation)) throw new TRPCError({ code: "BAD_REQUEST", message: "Type the displayed confirmation exactly before enabling AI assistance." });
+      const [currentPolicy] = await db.select({ enabled: organisations.varianceAiAssistanceEnabled }).from(organisations).where(eq(organisations.id, input.organisationId)).limit(1);
+      if (!currentPolicy) throw new TRPCError({ code: "NOT_FOUND", message: "Organisation not found." });
+      if (input.enabled && currentPolicy.enabled === 1) throw new TRPCError({ code: "CONFLICT", message: "AI variance assistance is already enabled. Disable it first before changing this policy." });
       return getOrCreateIdempotent({
         organisationId: input.organisationId,
         userId: ctx.user.id,
         action: "variance_ai.configure_policy",
         idempotencyKey: input.idempotencyKey,
-        request: { branchId: input.branchId, enabled: input.enabled, acceptProcessingNotice: input.acceptProcessingNotice },
+        request: { branchId: input.branchId, enabled: input.enabled, acceptProcessingNotice: input.acceptProcessingNotice, noticeVersion: input.enabled ? varianceAiProcessingNoticeVersion : null },
         execute: async () => {
           const correlationId = correlation();
           await db.transaction(async transaction => {
@@ -140,7 +143,7 @@ export const varianceAssistantRouter = router({
             await transaction.insert(auditEvents).values({
               id: recordId(), organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id,
               action: input.enabled ? "variance_ai.policy_enabled" : "variance_ai.policy_disabled", entityType: "organisation", entityId: input.organisationId, correlationId,
-              metadata: { purpose: "variance_assistance", acceptedProcessingNotice: input.enabled },
+              metadata: { purpose: "variance_assistance", acceptedProcessingNotice: input.enabled, noticeVersion: input.enabled ? varianceAiProcessingNoticeVersion : null, activationConfirmation: input.enabled ? "owner_typed" : null },
             });
           });
           return { entityId: input.organisationId, correlationId };
@@ -175,22 +178,24 @@ export const varianceAssistantRouter = router({
         request: { exceptionId: input.exceptionId },
         execute: async () => {
           const [linkedObligation] = exception.obligationId ? await db.select({ amountMinor: receivableObligations.amountMinor, currency: receivableObligations.currency, status: receivableObligations.status, dueAt: receivableObligations.dueAt }).from(receivableObligations).where(and(eq(receivableObligations.id, exception.obligationId), eq(receivableObligations.organisationId, input.organisationId), eq(receivableObligations.branchId, exception.branchId))).limit(1) : [];
-          const [linkedEvidence] = exception.evidenceEventId ? await db.select({ kind: evidenceEvents.kind, amountMinor: evidenceEvents.amountMinor, currency: evidenceEvents.currency, status: evidenceEvents.status, sourceName: evidenceEvents.sourceName, occurredAt: evidenceEvents.occurredAt }).from(evidenceEvents).where(and(eq(evidenceEvents.id, exception.evidenceEventId), eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, exception.branchId))).limit(1) : [];
+          const [linkedEvidence] = exception.evidenceEventId ? await db.select({ kind: evidenceEvents.kind, amountMinor: evidenceEvents.amountMinor, currency: evidenceEvents.currency, status: evidenceEvents.status, occurredAt: evidenceEvents.occurredAt }).from(evidenceEvents).where(and(eq(evidenceEvents.id, exception.evidenceEventId), eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, exception.branchId))).limit(1) : [];
           const obligations = exception.currency ? await db.select({ id: receivableObligations.id, branchId: receivableObligations.branchId, reference: receivableObligations.reference, amountMinor: receivableObligations.amountMinor, currency: receivableObligations.currency, status: receivableObligations.status, dueAt: receivableObligations.dueAt }).from(receivableObligations).where(and(eq(receivableObligations.organisationId, input.organisationId), eq(receivableObligations.branchId, exception.branchId), eq(receivableObligations.currency, exception.currency))).limit(9) : [];
-          const evidence = exception.currency ? await db.select({ id: evidenceEvents.id, branchId: evidenceEvents.branchId, sourceReference: evidenceEvents.sourceReference, kind: evidenceEvents.kind, amountMinor: evidenceEvents.amountMinor, currency: evidenceEvents.currency, status: evidenceEvents.status, sourceName: evidenceEvents.sourceName, occurredAt: evidenceEvents.occurredAt }).from(evidenceEvents).where(and(eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, exception.branchId), eq(evidenceEvents.currency, exception.currency))).limit(9) : [];
+          const evidence = exception.currency ? await db.select({ id: evidenceEvents.id, branchId: evidenceEvents.branchId, sourceReference: evidenceEvents.sourceReference, kind: evidenceEvents.kind, amountMinor: evidenceEvents.amountMinor, currency: evidenceEvents.currency, status: evidenceEvents.status, occurredAt: evidenceEvents.occurredAt }).from(evidenceEvents).where(and(eq(evidenceEvents.organisationId, input.organisationId), eq(evidenceEvents.branchId, exception.branchId), eq(evidenceEvents.currency, exception.currency))).limit(9) : [];
           const candidateRows: VarianceCandidate[] = [
             ...obligations.filter(row => row.id !== exception.obligationId && row.branchId === exception.branchId).filter(row => row.amountMinor !== null).map((row, index) => ({ candidateKey: `R${index + 1}`, kind: "receivable" as const, reference: row.reference, status: row.status, amountMinor: String(row.amountMinor), currency: row.currency, occurredAt: row.dueAt?.toISOString() ?? null })),
-            ...evidence.filter(row => row.id !== exception.evidenceEventId && row.branchId === exception.branchId).filter(row => row.amountMinor !== null && row.currency).map((row, index) => ({ candidateKey: `E${index + 1}`, kind: "evidence" as const, reference: row.sourceReference ?? row.id, status: row.status, amountMinor: String(row.amountMinor), currency: row.currency!, occurredAt: row.occurredAt?.toISOString() ?? null, sourceName: row.sourceName })),
+            ...evidence.filter(row => row.id !== exception.evidenceEventId && row.branchId === exception.branchId).filter(row => row.amountMinor !== null && row.currency).map((row, index) => ({ candidateKey: `E${index + 1}`, kind: "evidence" as const, reference: row.sourceReference ?? row.id, status: row.status, amountMinor: String(row.amountMinor), currency: row.currency!, occurredAt: row.occurredAt?.toISOString() ?? null })),
           ];
           const candidates = orderVarianceCandidates(candidateRows, String(exception.valueImpactMinor ?? "0")).slice(0, 12);
           const minimisedInput = {
             case: { type: exception.type, severity: exception.severity, status: exception.status, valueImpactMinor: String(exception.valueImpactMinor ?? "0"), currency: exception.currency, dueAt: exception.dueAt?.toISOString() ?? null },
             linkedRecords: {
               receivable: linkedObligation ? { amountMinor: String(linkedObligation.amountMinor), currency: linkedObligation.currency, status: linkedObligation.status, dueAt: linkedObligation.dueAt?.toISOString() ?? null } : null,
-              evidence: linkedEvidence ? { kind: linkedEvidence.kind, amountMinor: linkedEvidence.amountMinor === null ? null : String(linkedEvidence.amountMinor), currency: linkedEvidence.currency, status: linkedEvidence.status, sourceName: linkedEvidence.sourceName, occurredAt: linkedEvidence.occurredAt?.toISOString() ?? null } : null,
+              evidence: linkedEvidence ? { kind: linkedEvidence.kind, amountMinor: linkedEvidence.amountMinor === null ? null : String(linkedEvidence.amountMinor), currency: linkedEvidence.currency, status: linkedEvidence.status, occurredAt: linkedEvidence.occurredAt?.toISOString() ?? null } : null,
             },
             candidates: candidates.map(compactCandidate),
           };
+          const recentAnalyses = await db.select({ id: varianceAiSuggestions.id }).from(varianceAiSuggestions).where(and(eq(varianceAiSuggestions.organisationId, input.organisationId), eq(varianceAiSuggestions.exceptionId, exception.id), gte(varianceAiSuggestions.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000)))).limit(varianceAiDailyAnalysisLimit);
+          if (recentAnalyses.length >= varianceAiDailyAnalysisLimit) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `This case has reached its ${varianceAiDailyAnalysisLimit}-analysis review limit for the last 24 hours. Continue the normal evidence review.` });
           const models = await listLLMModels();
           const model = ["gpt-5-mini", "claude-haiku-4-5", "gemini-3-flash-preview"].find(id => models.data.some(item => item.id === id)) ?? models.data[0]?.id;
           if (!model) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No controlled analysis model is currently available." });
