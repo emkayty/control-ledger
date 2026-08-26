@@ -30,6 +30,10 @@ The final source validation passed on 26 August 2026:
 | Production diagnostic boundary | The generated public HTML has no debug-collector reference and no public debug-helper asset. |
 | Preview observation | Desktop authenticated Variance-centre preview remains available and continues to show the open NGN 29,997.78 case; no workflow control was activated. |
 
+## Published-route verification
+
+A cache-busted authenticated public check of `/variances?release=d8c4f9d4` completed after publication. The current public release rendered the English/Hausa selector, the disabled AI investigation assistant and its proposal-only processing notice, and the separate human decision controls. The original NGN 29,997.78 unmatched-record case remains **open**, has no submitted resolution, and has no AI suggestion. No business action was taken during this verification.
+
 ## Deliberate boundaries
 
 The **“Made with Manus”** chrome observed around hosted previews is platform-managed hosting chrome rather than source delivered by the application’s Vite production bundle. It is not injected by Control Ledger’s `index.html` or the generated production output, so this sanitation work does not attempt to remove or disguise it.
