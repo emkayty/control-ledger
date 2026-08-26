@@ -112,4 +112,4 @@
 - [x] Audit the complete Release 1–4 business-control chain, identify safe code/UX gaps, and document alignment, deviations, and external gates.
 - [x] Refine the mobile-first information architecture, compactness, visual hierarchy, empty/error states, and interaction cues for a more professional user-centred experience.
 - [x] Add targeted regression coverage for any business-rule or UX safety gap found during the final review.
-- [ ] Run final type, regression, desktop/mobile, and public-route verification; record an evidence-led readiness position without claiming unresolved external gates are complete.
+- [x] Run final type, regression, desktop/mobile, and current-checkpoint public-route verification; record an evidence-led readiness position without claiming unresolved external gates are complete. Type, test, preview, and cache-busted public-route checks all pass.

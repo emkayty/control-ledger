@@ -40,4 +40,6 @@ The shared interface retains the existing dark authority rail, pale ledger-grid 
 
 ## Final automated evidence
 
-After refinement, `pnpm check && pnpm test` passed with **24 test files and 90 tests**. The receipt-policy component test now confirms that the compact disclosure still exposes the raw-image, processing, and retention boundary. Desktop and mobile previews verified the updated dashboard, Operations, Evidence, and Ledger workspace hierarchy. A current public-domain check remains the final publication verification step for this checkpoint.
+After refinement, `pnpm check && pnpm test` passed with **24 test files and 90 tests**. The receipt-policy component test now confirms that the compact disclosure still exposes the raw-image, processing, and retention boundary. Desktop and mobile previews verified the updated dashboard, Operations, Evidence, and Ledger workspace hierarchy.
+
+Immediately after checkpoint `6c73b96a`, a cache-busted public dashboard check still displayed the earlier long-form dashboard without the compact Release 1–4 control chain. After a short propagation interval, a second cache-busted public check displayed the new **Release 1–4 · one control chain** with all four linked stages. The final refinements are now verified in the authorised development preview and on the configured public route.
