@@ -10,6 +10,8 @@ describe("receipt extraction policy card", () => {
     render(<ReceiptExtractionPolicyCard enabled={false} acceptedAt={null} acceptedBy={null} isOwner onManage={onManage} />);
     expect(screen.getByText("OPay extraction is disabled for this organisation")).toBeTruthy();
     expect(screen.getByText(/does not create evidence, reconcile value, or prove settlement/i)).toBeTruthy();
+    expect(screen.getByText("Processing and retention boundary")).toBeTruthy();
+    expect(screen.getByText(/not raw image bytes/i)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Review processing notice" }));
     expect(onManage).toHaveBeenCalledOnce();
   });
