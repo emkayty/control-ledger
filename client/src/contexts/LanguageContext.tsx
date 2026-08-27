@@ -93,6 +93,11 @@ const copy = {
     attachmentHint: "Optional · PDF, JPG, PNG or WebP · up to 3 files, 8 MB each",
     openAttachment: "Open attachment",
     uploadingAttachments: "Saving note attachments…",
+    preparingAttachments: "Preparing attachments…",
+    uploadingAttachmentProgress: "Uploading attachment",
+    previewAttachment: "Preview attachment",
+    exportVarianceReport: "Export PDF report",
+    exportingVarianceReport: "Preparing report…",
   },
   ha: {
     language: "Harshe",
@@ -184,6 +189,11 @@ const copy = {
     attachmentHint: "Na zaɓi ne · PDF, JPG, PNG ko WebP · fayiloli 3, MB 8 kowanne",
     openAttachment: "Buɗe abin da aka haɗa",
     uploadingAttachments: "Ana ajiye abubuwan da aka haɗa…",
+    preparingAttachments: "Ana shirya abubuwan da aka haɗa…",
+    uploadingAttachmentProgress: "Ana loda abin da aka haɗa",
+    previewAttachment: "Duba abin da aka haɗa",
+    exportVarianceReport: "Fitar da rahoton PDF",
+    exportingVarianceReport: "Ana shirya rahoto…",
   },
 } as const;
 

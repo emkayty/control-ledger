@@ -136,3 +136,7 @@
 - [x] Add additive, authorised investigation-note attachment storage and a protected saved-AI-suggestion variance filter that preserve tenant/branch scope and append-only history.
 - [x] Add the focused dashboard filter, AI-badge explanatory tooltip, and calm note-attachment interface without implying automatic matching, resolution, or approval.
 - [x] Test, verify responsively, publish, document, and synchronise the attachment and AI-suggestion enhancement.
+- [x] Define and document safe signed-thumbnail, upload-progress, and read-only PDF variance-report boundaries for scoped notes, attachments, and stored AI suggestions.
+- [x] Add authorised image-preview and variance-report data helpers that exclude raw storage keys/URLs and do not create or alter a control record.
+- [x] Add focused attachment thumbnail/progress feedback and a scoped variance PDF export action to the detail interface.
+- [ ] Test, verify responsively, publish, document, and synchronise the preview, feedback, and PDF-export enhancement.
