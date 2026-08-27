@@ -33,6 +33,12 @@ The full validation command, `pnpm check && pnpm test && pnpm build`, passed aft
 
 Direct database verification confirms `0` pharmacy policies, pharmacist authorisations, Pharmacy batch balances, dispensing requests, and supply events. No policy was enabled, no operator or pharmacist action was submitted, and no existing stock, finance, variance, evidence, attachment, or AI record changed.
 
+## Public propagation status
+
+The first two cache-busted public requests for checkpoint `88c85455` still served the earlier static Pharmacy prototype. This is documented as a publication-propagation delay; it is not a local validation failure. The current controlled workspace remains verified in the managed preview, and public verification remains open until a later cache-busted request shows the new owner-policy and pharmacist-authority controls. No Pharmacy action was attempted in either public check.
+
+After the deployment-success notice, the third cache-busted public check displayed the controlled Pharmacy workspace. It showed the disabled-by-owner policy state, explicit no-clinical-automation boundary, existing-user pharmacist-authorisation selector, credential-reference field, exact activation phrase field, empty authority register, and empty controlled queue. The activation control remained unavailable until a pharmacist is authorised. No form was completed or submitted; the public verification did not create a policy, authorisation, batch, request, review, stock movement, or supply event.
+
 ## Reference
 
 [1]: https://pcn.gov.ng/wp-content/uploads/2024/09/Pharmacy-Council-of-Nigeria-Act-2022-publication.pdf "Pharmacy Council of Nigeria (Establishment) Act, 2022"
