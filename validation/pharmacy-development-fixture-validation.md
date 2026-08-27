@@ -20,9 +20,9 @@ This capability provides a clearly labelled local preview for testing the existi
 
 ## Test and build evidence
 
-The focused TypeScript and fixture-related test suite passed with **5 test files and 13 tests**, covering the explicit load/return callback, deterministic fixture builder, queue filtering/sorting, CSV output, and page control composition. The final full `pnpm verify` gate passed with **36 test files and 123 tests**, including type checking and the production build. The production dependency audit reported no known vulnerabilities, and `git diff --check` reported no whitespace errors.
+The initial focused TypeScript and fixture-related test suite passed with **5 test files and 13 tests**, covering the explicit load/return callback, deterministic fixture builder, queue filtering/sorting, CSV output, and page control composition. After the switch and skeleton enhancement, the focused suite passed with **6 test files and 15 tests**, including direct production no-op coverage. The final full `pnpm verify` gate passed with **37 test files and 125 tests**, including type checking and the production build. The production dependency audit reported no known vulnerabilities, and `git diff --check` reported no whitespace errors.
 
-The final build produced a Pharmacy route bundle of **61.11 kB** before compression. Its post-build scan found no occurrence of `Load local test queue`, `Synthetic development fixtures`, `Local fixture`, or `pharmacyFixtures` under `dist/public`. The remaining build notice concerns an existing shared application JavaScript chunk exceeding the advisory 500 kB Rollup threshold; it is not a fixture exposure or build failure.
+The final build produced a Pharmacy route bundle of **61.11 kB** before compression. Its post-build scan found no occurrence of `Local test queue`, `Preparing local test queue`, `Synthetic non-clinical`, `FixtureQueueLoadingSkeleton`, or `pharmacyFixtures` under `dist/public`. The remaining build notice concerns an existing shared application JavaScript chunk exceeding the advisory 500 kB Rollup threshold; it is not a fixture exposure or build failure.
 
 ## Preview and interaction evidence
 
@@ -44,6 +44,12 @@ The final read-only database check reported zero records in every live Pharmacy 
 | Dispensing decisions | 0 |
 | Pharmacy supply events | 0 |
 | Control exception `8338df03-8947-4623-a1e8-b1d75c14a42f` | `open`; impact minor units `2999778`; `resolvedAt = NULL` |
+
+## Switch and skeleton enhancement validation
+
+The development-only fixture control now uses an accessible visual switch labelled **Local test queue**. When off, its companion text says that the user is viewing the current authorised scoped queue and makes clear that the switch does not initiate provider validation. When on, the local fixture callbacks remain the only path. Before those callbacks are invoked, the control replaces itself with a compact live-status skeleton headed **Preparing local test queue**, with three neutral queue placeholder rows and a clear statement that no Pharmacy service is called.
+
+Focused coverage verifies the unchecked and checked switch states, local preparation delay, six fixture callback records, return-to-authorised-queue callback, skeleton status copy, and production no-op component. The development route was reviewed at desktop and mobile dimensions: the wording, switch, and read-only queue controls remained visible and compact. The first desktop screenshot occurred while Vite was applying a one-time dependency-optimisation reload for the existing switch package and was blank; the immediate retry completed normally, with no current browser-console error. No switch was operated during visual review; the interaction path is covered by the component tests.
 
 ## Public deployment verification
 

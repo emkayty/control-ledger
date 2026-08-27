@@ -164,3 +164,5 @@
 - [x] Define a development-only, browser-memory Pharmacy fixture boundary that uses synthetic non-clinical requests and cannot call protected write procedures or persist a live record.
 - [x] Add a deterministic local fixture queue control for exercising request filters, urgency/order logic, and current-view CSV export during development only.
 - [x] Test and document fixture isolation, synthetic-data labelling, filter/search coverage, and CSV contents without creating any Pharmacy, patient, prescription, stock, approval, or supply data.
+- [x] Add a development-only visual switch that alternates only between browser-memory synthetic fixtures and the current authorised scoped queue, without initiating provider validation or writing Pharmacy data.
+- [x] Add, test, verify, document, publish, and synchronise an accessible compact skeleton state while local Pharmacy fixture data is being prepared, while preserving production fixture exclusion.
