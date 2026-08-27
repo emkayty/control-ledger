@@ -27,6 +27,8 @@ The 375 px review covered the control desk, receivables, evidence intake, operat
 
 Collections and Pharmacy initially displayed their intentional loading states during the concurrent capture and both resolved on a subsequent viewport capture. Collections displayed its zero-item/non-settling dashboard without overflow. Pharmacy displayed the owner-disabled policy, no-clinical-automation boundary, and pharmacist-authority prerequisites without exposing a development fixture, synthetic label, failure simulator, delay control, or debug log. No touch or click action was taken.
 
+A subsequent 375 px review completed the previously missing mobile routes. Exceptions showed the same open NGN 29,997.78 unmatched-record card, closed investigation-notes section, and independent-approval boundary without overflow. Audit trail showed scoped material-action cards, actor/time/correlation attribution, and the existing `variance AI · policy enabled` event without opening a record or changing a filter. These observations complete the mobile rendering evidence for the existing receivable, reconciliation/evidence, exception, and audit surfaces.
+
 > This is a responsive browser-viewport review, not a substitute for acceptance on organisation-owned physical devices, assistive technologies, representative networks, or other roles. Those evidence gates remain open.
 
 ## Acceptance outcome and retained gates
@@ -44,3 +46,5 @@ The responsive viewport review covered the same core operating paths and showed 
 | Is real Pharmacy use authorised? | No. The published Pharmacy page remains disabled by owner policy and has no active pharmacist authority or request. | Credential verification, pharmacist/owner authorisation, approved activation, privacy governance, operating procedures, and relevant operational checks. |
 
 This review closes only the three newly requested **read-only acceptance-record** tasks. It does not close the pre-existing broader production, real-device, provider-managed storage, monitoring/backup/incident, capacity, pharmacist, privacy, or health-data governance checklist items.
+
+The documented observations and fresh post-review logs satisfy the earlier **read-only** desktop/mobile smoke-rendering and capture checklist entries for the existing receivable, reconciliation/evidence, exception, and audit views. This review does not satisfy the distinct entries for submitting an approval, opening a secure preview, applying an extraction proposal, testing on a physical device, or remediating a provider-issued legacy storage URL.

@@ -34,8 +34,8 @@
 - [x] Add isolated material-action procedure tests covering idempotency recording, reconciliation mutation, approval control, and append-only correction creation without writing customer workspace records.
 - [x] Add a tRPC integration-style test for authenticated protected workspace access and scoped response shaping without writing artificial business records.
 - [x] Add isolated protected-scope procedure tests that verify allowed roles and fail-closed unauthorised membership outcomes without inserting operational test data.
-- [ ] Conduct authenticated dashboard, receivables, evidence, reconciliation, and exceptions smoke tests using user-owned workspace data on desktop and mobile; then inspect runtime logs.
-- [ ] Capture authenticated desktop and mobile verification of the real receivable, live reconciliation state, evidence, exception, and audit views before final release sign-off.
+- [x] Conduct authenticated dashboard, receivables, evidence, reconciliation, and exceptions smoke tests using user-owned workspace data on desktop and mobile; then inspect runtime logs. Completed 27 August 2026 as a signed-in read-only published-route and responsive viewport review; fresh post-review server/browser logs contained no errors or warnings.
+- [x] Capture authenticated desktop and mobile verification of the real receivable, live reconciliation state, evidence, exception, and audit views before final release sign-off. Completed 27 August 2026 through the documented read-only published-route and responsive viewport review; no workflow action was selected.
 - [x] Review the user-created workspace records and report whether the implemented Release 1 controls operate as intended.
 - [x] Add owner/controller-governed membership management for existing users, including organisation-wide and branch-scoped role assignment, revocation, and access visibility.
 - [x] Add owner-governed branch creation and branch visibility so an organisation can operate multiple independently scoped branches.
@@ -181,3 +181,5 @@
 - [x] Conduct and record an authorised read-only desktop acceptance review of the published control desk, receivables, evidence, operations, collections, ledger, variances, access, audit, and Pharmacy routes without invoking a workflow action.
 - [x] Conduct and record an authorised read-only mobile acceptance review of the published control desk, navigation, operational workspaces, ledger, variances, and Pharmacy routes without invoking a workflow action.
 - [x] Reconcile the results with the existing broader production, real-device, provider, pharmacist, privacy, and resilience gates without claiming unauthorised or unperformed acceptance evidence.
+- [x] Perform and record a read-only mobile review of the published Exceptions workspace, confirming the open variance without submitting a note, attachment, resolution, or approval.
+- [x] Perform and record a read-only mobile review of the published Audit trail, confirming scoped material-action history renders without opening a workflow action.
