@@ -24,3 +24,11 @@ Focused TypeScript and queue/UI tests passed before full regression: the pure he
 The full validation command, `pnpm check && pnpm test && pnpm build`, passed after the controls were added. The regression suite has **33 test files / 114 tests**. The production package passed; it retains only the pre-existing Vite large-chunk advisory.
 
 No Pharmacy request, batch, policy, pharmacist authorisation, review, stock movement, supply event, financial record, AI record, or variance changed during this work.
+
+## Public propagation status
+
+The first cache-busted public check for `b390c7f5` loaded the controlled Pharmacy workspace and retained all owner, pharmacist-authorisation, and no-clinical-automation safeguards. It was still serving the prior queue empty-state without the new toolbar. This is recorded as a normal publication-propagation delay; public verification remains open pending a later cache-busted check. No Pharmacy form or action was used.
+
+The second cache-busted request was initiated after the deployment-success notice, but its browser load remained transiently blank at the observation point. No queue control or Pharmacy action was used. A final cache-busted observation remains required before the release record is closed.
+
+The third cache-busted public check displayed the current queue toolbar: `0 requests shown`, Clear filters, status selection, urgency selection, from/to date fields, and urgency/newest/oldest/status ordering. The public screen also retained the owner-disabled policy, active-authorisation count of zero, no pharmacist authority, no-clinical-automation boundary, and empty authority register. This completes public verification. No filter was changed and no Pharmacy form, approval, stock, or supply action was submitted.
