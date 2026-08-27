@@ -54,6 +54,12 @@ The final desktop review confirmed the **Pharmacy control** navigation label, ow
 
 Read-only database verification after all changes returned zero records for Pharmacy policies, pharmacist authorisations, dispensing requests, decisions, supply events, and Pharmacy batch balances. The existing control exception remains `open`, has `valueImpactMinor` of `2999778` (NGN 29,997.78), and has no resolution timestamp.
 
+The first cache-busted public observation for checkpoint `af48fae9` loaded the existing controlled Pharmacy workflow and preserved the disabled policy, zero-authorisation state, and no-clinical-data boundary. It was still serving the prior navigation label and prior queue toolbar without the `REQ-` search field, so the consolidation release is recorded as awaiting normal public propagation. No form, filter, search, approval, or supply action was used.
+
+The second cache-busted public observation completed after a short propagation interval but still served the prior **Pharmacy preview** navigation and pre-search queue toolbar. The managed development preview remains verified with the updated `REQ-` reference search, cursor load control, and **Pharmacy control** label. A third public check remains required; no public input or controlled action was used.
+
+After the deployment-success notice, the third cache-busted public check showed **Pharmacy control** in the navigation and the visible **Find by Control Ledger request reference** input. The page explicitly stated that it does not search or store patient names, prescription identifiers, or prescription text, while retaining disabled-by-owner policy, zero pharmacist authorisations, no-clinical-automation, and the unchanged empty queue. No public input, filter, authorisation, activation, batch, review, supply, financial, AI, or variance action was used. This completes public verification of the consolidation milestone.
+
 OWASP ASVS is used as a practical verification reference because it provides a basis for testing web-application technical controls and secure-development requirements.[4] The Pharmacy feedback also follows the WCAG 2.2 principle that detected input errors should identify the failed input and describe the problem in text, rather than relying on colour or a silent failed submit.[5]
 
 ## Risk register and remaining launch gates

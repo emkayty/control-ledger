@@ -157,4 +157,4 @@
 - [x] Implement only verified, low-risk consolidation and usability improvements, including a safe scoped dispensing-request reference search where appropriate.
 - [x] Stress-test critical control paths, boundary handling, exact-value logic, concurrency/idempotency assumptions, accessibility, responsive behaviour, and production package health without creating live operating records.
 - [x] Produce a standards-aware market-readiness, Blue Ocean, and Business Model Canvas assessment that distinguishes completed product capabilities from genuine external governance and launch gates.
-- [ ] Publish, publicly verify, document, and synchronise the consolidation milestone without changing live financial, variance, pharmacy, patient, prescription, or stock data.
+- [x] Publish, publicly verify, document, and synchronise the consolidation milestone without changing live financial, variance, pharmacy, patient, prescription, or stock data.
