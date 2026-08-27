@@ -78,6 +78,8 @@ const copy = {
     todayControlRun: "Today’s control run",
     controlChain: "Source fact → evidence → decision → governed consequence.",
     priorityExceptions: "Priority exceptions",
+    aiVarianceActive: "AI variance assistance active",
+    aiVarianceActiveNote: "Suggestions only · people decide",
   },
   ha: {
     language: "Harshe",
@@ -154,6 +156,8 @@ const copy = {
     todayControlRun: "Aikin kula na yau",
     controlChain: "Bayanan asali → shaida → hukunci → sakamako mai kulawa.",
     priorityExceptions: "Muhimman lamuran banbanci",
+    aiVarianceActive: "Taimakon AI na bambanci yana aiki",
+    aiVarianceActiveNote: "Shawarwari kawai · mutane ne ke yanke hukunci",
   },
 } as const;
 
