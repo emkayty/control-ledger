@@ -2,9 +2,9 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import PharmacyFixtureControls, { FixtureModeHeaderBadge, FixtureQueueLoadingSkeleton } from "./PharmacyFixtureControls";
+import PharmacyFixtureControls, { FixtureModeHeaderBadge, FixturePreparationFailure, FixtureQueueLoadingSkeleton } from "./PharmacyFixtureControls";
 
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("PharmacyFixtureControls", () => {
   it("uses a visual switch to prepare only local synthetic fixtures", () => {
@@ -57,5 +57,34 @@ describe("PharmacyFixtureControls", () => {
   it("renders a persistent, plainly synthetic local-mode header badge", () => {
     render(<FixtureModeHeaderBadge />);
     expect(screen.getByTestId("fixture-header-badge").textContent).toMatch(/Local test queue active.*synthetic data/i);
+  });
+
+  it("explains the synthetic-data boundary on header-badge focus", async () => {
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    render(<FixtureModeHeaderBadge />);
+    fireEvent.focus(screen.getByTestId("fixture-header-badge"));
+    expect((await screen.findByRole("tooltip")).textContent).toMatch(/locally generated.*not an authorised request.*patient record/i);
+  });
+
+  it("simulates an offline local preparation failure without loading fixtures", () => {
+    vi.useFakeTimers();
+    const onLoad = vi.fn();
+    render(<PharmacyFixtureControls fixtureMode={false} onLoad={onLoad} onClear={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText("Fixture preparation simulation"), { target: { value: "offline" } });
+    fireEvent.click(screen.getByRole("switch", { name: "Use local synthetic test queue" }));
+    act(() => vi.advanceTimersByTime(180));
+
+    expect(screen.getByRole("alert").textContent).toMatch(/Simulated offline condition.*No connection was attempted.*no Pharmacy service.*data change occurred/i);
+    expect(onLoad).not.toHaveBeenCalled();
+  });
+
+  it("keeps local error recovery controls separate from operating actions", () => {
+    const onRetry = vi.fn(); const onReturn = vi.fn();
+    render(<FixturePreparationFailure mode="timeout" onRetry={onRetry} onReturn={onReturn} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry local preview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Return to authorised queue" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onReturn).toHaveBeenCalledTimes(1);
   });
 });

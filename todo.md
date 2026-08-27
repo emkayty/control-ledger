@@ -168,3 +168,5 @@
 - [x] Add, test, verify, document, publish, and synchronise an accessible compact skeleton state while local Pharmacy fixture data is being prepared, while preserving production fixture exclusion.
 - [x] Add a development-only, reduced-motion-aware pulse and truthful local fixture preparation progress indicator without contacting a Pharmacy service.
 - [x] Add, test, verify, document, publish, and synchronise a persistent development-only header badge when the browser-memory local test queue is active, while retaining production exclusion.
+- [x] Add development-only local fixture preparation error-state simulation that never performs a real network request, provider validation, or Pharmacy mutation.
+- [x] Add, test, verify, document, publish, and synchronise an accessible synthetic-data explanation tooltip for the development-only local-queue header badge while preserving production exclusion.
