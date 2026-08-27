@@ -166,3 +166,5 @@
 - [x] Test and document fixture isolation, synthetic-data labelling, filter/search coverage, and CSV contents without creating any Pharmacy, patient, prescription, stock, approval, or supply data.
 - [x] Add a development-only visual switch that alternates only between browser-memory synthetic fixtures and the current authorised scoped queue, without initiating provider validation or writing Pharmacy data.
 - [x] Add, test, verify, document, publish, and synchronise an accessible compact skeleton state while local Pharmacy fixture data is being prepared, while preserving production fixture exclusion.
+- [x] Add a development-only, reduced-motion-aware pulse and truthful local fixture preparation progress indicator without contacting a Pharmacy service.
+- [x] Add, test, verify, document, publish, and synchronise a persistent development-only header badge when the browser-memory local test queue is active, while retaining production exclusion.

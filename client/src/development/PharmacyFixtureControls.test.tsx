@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import PharmacyFixtureControls, { FixtureQueueLoadingSkeleton } from "./PharmacyFixtureControls";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import PharmacyFixtureControls, { FixtureModeHeaderBadge, FixtureQueueLoadingSkeleton } from "./PharmacyFixtureControls";
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -19,10 +19,14 @@ describe("PharmacyFixtureControls", () => {
     fireEvent.click(fixtureSwitch);
 
     expect(screen.getByRole("status").textContent).toMatch(/Preparing local test queue/i);
+    expect(screen.getByRole("progressbar", { name: "Local test queue preparation" }).getAttribute("aria-valuenow")).toBe("12");
     expect(document.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
     expect(onLoad).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(180);
+    act(() => vi.advanceTimersByTime(85));
+    expect(screen.getByText("68% ready")).toBeTruthy();
+
+    act(() => vi.advanceTimersByTime(95));
 
     expect(onLoad).toHaveBeenCalledTimes(1);
     const fixtures = onLoad.mock.calls[0][0];
@@ -41,10 +45,17 @@ describe("PharmacyFixtureControls", () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
-  it("labels the standalone local preparation skeleton without suggesting a provider request", () => {
-    render(<FixtureQueueLoadingSkeleton />);
+  it("labels the pulsing local preparation skeleton with truthful progress and no provider request", () => {
+    render(<FixtureQueueLoadingSkeleton progress={64} />);
 
     expect(screen.getByRole("status").textContent).toMatch(/No Pharmacy service is called/i);
+    expect(screen.getByText("64% ready")).toBeTruthy();
+    expect(screen.getByRole("progressbar", { name: "Local test queue preparation" }).getAttribute("aria-valuenow")).toBe("64");
     expect(document.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
+  });
+
+  it("renders a persistent, plainly synthetic local-mode header badge", () => {
+    render(<FixtureModeHeaderBadge />);
+    expect(screen.getByTestId("fixture-header-badge").textContent).toMatch(/Local test queue active.*synthetic data/i);
   });
 });

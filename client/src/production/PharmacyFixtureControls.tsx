@@ -13,3 +13,7 @@ export default function PharmacyFixtureControls(_: Props) {
 export function FixtureSafetyNotice() {
   return null;
 }
+
+export function FixtureModeHeaderBadge() {
+  return null;
+}
