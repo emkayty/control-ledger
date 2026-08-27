@@ -145,3 +145,7 @@
 - [x] Add a clearly labelled non-operational Pharmacy dispensing prototype that demonstrates pharmacist approval and batch/expiry tracking without enabling dispense actions.
 - [x] Design typed, organisation- and branch-scoped API contracts through which isolated Pharmacy and School packs use the shared Control Ledger core.
 - [x] Validate, document, publish, and synchronise the extension prototype and interface design without changing live operating records.
+- [x] Define the pharmacist-led dispensing safety boundary, independent-review rules, batch/expiry/quarantine constraints, privacy assumptions, and acceptance tests before enabling any pharmacy write path.
+- [x] Add additive pharmacy data structures and protected, append-only batch receipt, dispensing draft, pharmacist-review, and controlled supply procedures without clinical automation.
+- [x] Upgrade the Pharmacy preview into a scoped operational workspace with real-time server validation, clear loading/recovery feedback, and no unauthorised approval or supply action.
+- [ ] Test, verify, publish, document, and synchronise the controlled Pharmacy dispensing release without creating live medicine, patient, prescription, batch, stock, or supply records.

@@ -470,6 +470,159 @@ export const stockLots = mysqlTable(
   ],
 );
 
+/**
+ * Owner-governed activation for the Pharmacy pack. It is disabled by default
+ * and requires explicit acknowledgement before any dispensing write is allowed.
+ */
+export const pharmacyPolicies = mysqlTable(
+  "pharmacyPolicies",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    isEnabled: int("isEnabled").notNull().default(0),
+    noticeVersion: varchar("noticeVersion", { length: 32 }).notNull().default("pharmacy-dispensing-v1"),
+    enabledAt: timestamp("enabledAt"),
+    enabledByUserId: int("enabledByUserId"),
+    disabledAt: timestamp("disabledAt"),
+    disabledByUserId: int("disabledByUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [uniqueIndex("pharmacy_policy_org_unique").on(table.organisationId)],
+);
+
+/**
+ * A scoped owner attestation that an existing Control Ledger user is authorised
+ * to make a pharmacist review decision. The reference is recorded for audit;
+ * verification against an external register remains an operational gate.
+ */
+export const pharmacyPharmacistAuthorisations = mysqlTable(
+  "pharmacyPharmacistAuthorisations",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    userId: int("userId").notNull(),
+    credentialReference: varchar("credentialReference", { length: 160 }).notNull(),
+    status: mysqlEnum("status", ["active", "revoked", "expired"]).notNull().default("active"),
+    expiresAt: timestamp("expiresAt"),
+    authorisedAt: timestamp("authorisedAt").defaultNow().notNull(),
+    authorisedByUserId: int("authorisedByUserId").notNull(),
+    revokedAt: timestamp("revokedAt"),
+    revokedByUserId: int("revokedByUserId"),
+    revocationReason: varchar("revocationReason", { length: 500 }),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+  },
+  table => [
+    uniqueIndex("pharmacy_pharmacist_scope_user_unique").on(table.organisationId, table.branchId, table.userId),
+    index("pharmacy_pharmacist_scope_status_index").on(table.organisationId, table.branchId, table.status, table.expiresAt),
+  ],
+);
+
+/**
+ * Atomically maintained availability for Pharmacy-received stock lots. Existing
+ * general inventory lots are intentionally not assumed safe for dispensing until
+ * they are separately received through the Pharmacy control path.
+ */
+export const pharmacyBatchBalances = mysqlTable(
+  "pharmacyBatchBalances",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    productId: varchar("productId", { length: 36 }).notNull(),
+    stockLotId: varchar("stockLotId", { length: 36 }).notNull(),
+    availableQuantity: decimal("availableQuantity", { precision: 20, scale: 3 }).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("pharmacy_batch_balance_lot_unique").on(table.stockLotId),
+    index("pharmacy_batch_balance_scope_product_index").on(table.organisationId, table.branchId, table.productId, table.availableQuantity),
+  ],
+);
+
+/**
+ * A non-clinical, source-referenced dispensing control record. It deliberately
+ * stores no patient detail or prescription text and cannot be silently edited.
+ */
+export const pharmacyDispensingRequests = mysqlTable(
+  "pharmacyDispensingRequests",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    sourceReference: varchar("sourceReference", { length: 128 }).notNull(),
+    status: mysqlEnum("status", ["draft", "pending_review", "returned", "rejected", "approved_for_supply", "supplied"])
+      .notNull()
+      .default("draft"),
+    submittedAt: timestamp("submittedAt"),
+    suppliedAt: timestamp("suppliedAt"),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    index("pharmacy_dispensing_scope_status_index").on(table.organisationId, table.branchId, table.status, table.createdAt),
+    index("pharmacy_dispensing_source_index").on(table.organisationId, table.branchId, table.sourceReference),
+  ],
+);
+
+export const pharmacyDispensingLines = mysqlTable(
+  "pharmacyDispensingLines",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    dispensingRequestId: varchar("dispensingRequestId", { length: 36 }).notNull(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    productId: varchar("productId", { length: 36 }).notNull(),
+    stockLotId: varchar("stockLotId", { length: 36 }).notNull(),
+    quantity: decimal("quantity", { precision: 20, scale: 3 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("pharmacy_dispensing_line_request_index").on(table.dispensingRequestId),
+    index("pharmacy_dispensing_line_batch_index").on(table.organisationId, table.branchId, table.stockLotId),
+  ],
+);
+
+/** Each review is a separate append-only decision; request status is only a current-state projection. */
+export const pharmacyDispensingDecisions = mysqlTable(
+  "pharmacyDispensingDecisions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    dispensingRequestId: varchar("dispensingRequestId", { length: 36 }).notNull(),
+    decision: mysqlEnum("decision", ["submitted", "approved", "returned", "rejected"]).notNull(),
+    rationale: text("rationale").notNull(),
+    pharmacistAuthorisationId: varchar("pharmacistAuthorisationId", { length: 36 }),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("pharmacy_dispensing_decision_request_index").on(table.organisationId, table.branchId, table.dispensingRequestId, table.createdAt)],
+);
+
+/** A single, idempotent supply consequence for an approved dispensing request. */
+export const pharmacySupplyEvents = mysqlTable(
+  "pharmacySupplyEvents",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    dispensingRequestId: varchar("dispensingRequestId", { length: 36 }).notNull(),
+    suppliedAt: timestamp("suppliedAt").notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [
+    uniqueIndex("pharmacy_supply_request_unique").on(table.dispensingRequestId),
+    index("pharmacy_supply_scope_time_index").on(table.organisationId, table.branchId, table.suppliedAt),
+  ],
+);
+
 export const customerOrders = mysqlTable(
   "customerOrders",
   {
@@ -582,7 +735,7 @@ export const stockMovements = mysqlTable(
     branchId: varchar("branchId", { length: 36 }).notNull(),
     productId: varchar("productId", { length: 36 }).notNull(),
     stockLotId: varchar("stockLotId", { length: 36 }),
-    movementType: mysqlEnum("movementType", ["opening", "receipt", "delivery", "transfer_out", "transfer_in", "adjustment"])
+    movementType: mysqlEnum("movementType", ["opening", "receipt", "delivery", "transfer_out", "transfer_in", "adjustment", "pharmacy_supply"])
       .notNull(),
     quantityDelta: decimal("quantityDelta", { precision: 20, scale: 3 }).notNull(),
     deliveryId: varchar("deliveryId", { length: 36 }),

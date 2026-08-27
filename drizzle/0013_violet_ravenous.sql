@@ -1,0 +1,1 @@
+ALTER TABLE `stockMovements` MODIFY COLUMN `movementType` enum('opening','receipt','delivery','transfer_out','transfer_in','adjustment','pharmacy_supply') NOT NULL;

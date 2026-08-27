@@ -1,28 +1,23 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import PharmacyPrototypePage from "./PharmacyPrototypePage";
+import { PharmacyApprovalFeedback } from "./PharmacyPrototypePage";
 
 afterEach(cleanup);
 
-describe("pharmacy dispensing prototype", () => {
-  it("shows a non-operational pharmacist gate and does not expose a supply action", () => {
-    render(<PharmacyPrototypePage />);
+describe("pharmacy real-time approval feedback", () => {
+  it("reports that a controlled batch revalidation is in progress", () => {
+    render(<PharmacyApprovalFeedback loading eligible={false} />);
 
-    expect(screen.getByText("No dispensing enabled")).toBeTruthy();
-    expect(screen.getByText(/does not store a prescription, patient record, batch, approval, sale, or stock movement/i)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Pharmacist approval is not enabled" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.queryByRole("button", { name: /supply|dispense|reserve batch/i })).toBeNull();
+    expect(screen.getByText("Rechecking controlled batch eligibility…")).toBeTruthy();
   });
 
-  it("reveals required pharmacist checks without creating an approval", () => {
-    render(<PharmacyPrototypePage />);
+  it("communicates an ineligible batch without implying approval or supply", () => {
+    const { rerender } = render(<PharmacyApprovalFeedback loading={false} eligible={false} reason="The selected batch is expired and cannot be supplied." />);
+    expect(screen.getByText("The selected batch is expired and cannot be supplied.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show required review checks" }));
-
-    expect(screen.getByLabelText("Required pharmacist review checks")).toBeTruthy();
-    expect(screen.getByText(/licensed pharmacist reviews the source order/i)).toBeTruthy();
-    expect(screen.getByText(/cannot capture approval, reserve a batch, or record supply/i)).toBeTruthy();
+    rerender(<PharmacyApprovalFeedback loading={false} eligible reason="Batch is active, in date, and sufficient." />);
+    expect(screen.getByText("Batch is currently eligible for pharmacist review.")).toBeTruthy();
   });
 });
