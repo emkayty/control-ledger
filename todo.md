@@ -144,4 +144,4 @@
 - [x] Break down the school fee-collection estimate into frontend, backend, quality-assurance, and rollout tasks with explicit assumptions.
 - [x] Add a clearly labelled non-operational Pharmacy dispensing prototype that demonstrates pharmacist approval and batch/expiry tracking without enabling dispense actions.
 - [x] Design typed, organisation- and branch-scoped API contracts through which isolated Pharmacy and School packs use the shared Control Ledger core.
-- [ ] Validate, document, publish, and synchronise the extension prototype and interface design without changing live operating records.
+- [x] Validate, document, publish, and synchronise the extension prototype and interface design without changing live operating records.
