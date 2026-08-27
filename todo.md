@@ -158,3 +158,6 @@
 - [x] Stress-test critical control paths, boundary handling, exact-value logic, concurrency/idempotency assumptions, accessibility, responsive behaviour, and production package health without creating live operating records.
 - [x] Produce a standards-aware market-readiness, Blue Ocean, and Business Model Canvas assessment that distinguishes completed product capabilities from genuine external governance and launch gates.
 - [x] Publish, publicly verify, document, and synchronise the consolidation milestone without changing live financial, variance, pharmacy, patient, prescription, or stock data.
+- [x] Define a safe Pharmacy dispensing-request CSV schema that exports only the currently filtered, already authorised queue and excludes patient/prescription content, clinical data, and mutable storage details.
+- [x] Add a compact client-side CSV export action for the currently filtered Pharmacy request queue with safe CSV escaping and filename scoping.
+- [ ] Test, verify, publish, document, and synchronise the read-only Pharmacy queue CSV export without submitting any Pharmacy action.

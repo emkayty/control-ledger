@@ -24,7 +24,7 @@ function timestamp(value: Date | string) {
   return new Date(value).getTime();
 }
 
-export function pharmacyRequestUrgency(record: PharmacyQueueRecord, now = new Date()): PharmacyRequestUrgency {
+export function pharmacyRequestUrgency(record: Pick<PharmacyQueueRecord, "status" | "createdAt">, now = new Date()): PharmacyRequestUrgency {
   if (record.status === "supplied" || record.status === "rejected") return "completed";
   const ageDays = Math.max(0, now.getTime() - timestamp(record.createdAt)) / DAY_MS;
   if ((record.status === "pending_review" || record.status === "approved_for_supply") && ageDays >= 1) return "urgent";

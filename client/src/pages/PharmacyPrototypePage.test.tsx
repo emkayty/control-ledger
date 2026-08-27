@@ -23,7 +23,7 @@ describe("pharmacy real-time approval feedback", () => {
 
   it("searches only through the compact controlled-request-reference filter", () => {
     const onChange = vi.fn();
-    render(<QueueToolbar count={0} filters={{ status: "all", urgency: "all", sort: "urgency" }} onChange={onChange} />);
+    render(<QueueToolbar count={0} filters={{ status: "all", urgency: "all", sort: "urgency" }} onChange={onChange} onExport={vi.fn()} exporting={false} />);
 
     fireEvent.change(screen.getByLabelText("Find by Control Ledger request reference"), { target: { value: "REQ-000427" } });
 
