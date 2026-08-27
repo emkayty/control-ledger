@@ -79,6 +79,11 @@ describe("PharmacyFixtureControls", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/Simulated offline condition.*No connection was attempted.*no Pharmacy service.*data change occurred/i);
     expect(onLoad).not.toHaveBeenCalled();
     expect(screen.getByRole("log", { name: "Local simulated error log" }).textContent).toMatch(/offline simulated after 180 ms/i);
+    const clearLog = screen.getByRole("button", { name: "Clear log" });
+    expect(clearLog.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(clearLog);
+    expect(screen.getByRole("log", { name: "Local simulated error log" }).textContent).toMatch(/No local simulated errors recorded/i);
+    expect(clearLog.hasAttribute("disabled")).toBe(true);
   });
 
   it("uses a bounded custom local delay without delaying a live service", () => {
@@ -101,6 +106,7 @@ describe("PharmacyFixtureControls", () => {
     fireEvent.change(delayInput, { target: { value: "99999" } });
     expect(delayInput.value).toBe("5000");
     expect(screen.getByRole("log", { name: "Local simulated error log" }).textContent).toMatch(/No local simulated errors recorded/i);
+    expect(screen.getByRole("button", { name: "Clear log" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("keeps local error recovery controls separate from operating actions", () => {

@@ -172,3 +172,4 @@
 - [x] Add, test, verify, document, publish, and synchronise an accessible synthetic-data explanation tooltip for the development-only local-queue header badge while preserving production exclusion.
 - [x] Add a bounded development-only custom local delay input for slow-connection fixture preparation without delaying or intercepting live Pharmacy services.
 - [x] Add, test, verify, document, publish, and synchronise a browser-memory debug log of simulated fixture preparation failures, preserving production exclusion and zero live data changes.
+- [x] Make the development-only local simulation-log Clear log action consistently visible, disabled when empty, and verify it only clears browser-memory simulated error history.
