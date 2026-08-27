@@ -152,6 +152,12 @@ export const varianceAssistantRouter = router({
     }),
   }),
   suggestions: router({
+    reviewQueue: protectedProcedure.input(scopeInput).query(async ({ ctx, input }) => {
+      const db = await requireActiveScope({ ...input, userId: ctx.user.id, allowed: permissions.read });
+      const suggestions = await db.select({ exceptionId: varianceAiSuggestions.exceptionId, createdAt: varianceAiSuggestions.createdAt, confidence: varianceAiSuggestions.confidence, status: controlExceptions.status }).from(varianceAiSuggestions).innerJoin(controlExceptions, and(eq(controlExceptions.id, varianceAiSuggestions.exceptionId), eq(controlExceptions.organisationId, input.organisationId), eq(controlExceptions.branchId, input.branchId))).where(and(eq(varianceAiSuggestions.organisationId, input.organisationId), eq(varianceAiSuggestions.branchId, input.branchId))).orderBy(desc(varianceAiSuggestions.createdAt));
+      const seen = new Set<string>();
+      return suggestions.filter(suggestion => !["resolved", "rejected"].includes(suggestion.status) && !seen.has(suggestion.exceptionId) && Boolean(seen.add(suggestion.exceptionId))).map(({ status: _status, ...suggestion }) => suggestion);
+    }),
     list: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });

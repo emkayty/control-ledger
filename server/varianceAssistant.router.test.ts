@@ -23,7 +23,7 @@ function database(selections: unknown[][]) {
   const insert = () => ({ values: async (payload: Record<string, unknown>) => { inserts.push(payload); return { affectedRows: 1 }; } });
   const update = () => ({ set: (payload: Record<string, unknown>) => ({ where: async () => { updates.push(payload); return { affectedRows: 1 }; } }) });
   const db = {
-    select: () => ({ from: () => ({ where: () => query(selections.shift() ?? []) }) }),
+    select: () => ({ from: () => ({ where: () => query(selections.shift() ?? []), innerJoin: () => ({ where: () => query(selections.shift() ?? []) }) }) }),
     insert,
     update,
     delete: () => ({ where: async () => ({ affectedRows: 1 }) }),
@@ -108,6 +108,23 @@ describe("protected AI variance assistance", () => {
     getDbMock.mockResolvedValue(db);
 
     await expect(appRouter.createCaller(context()).varianceAi.suggestions.analyse({ organisationId, exceptionId, idempotencyKey: "variance-budget-01" })).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    expect(invokeLLMMock).not.toHaveBeenCalled();
+  });
+
+  it("returns only unique unresolved same-branch variances with saved suggestions for review without invoking the model", async () => {
+    const { db } = database([
+      [ownerMembership], [{ id: branchId }],
+      [
+        { exceptionId: "open-case", createdAt: new Date("2026-08-27T00:00:00.000Z"), confidence: "high", status: "open" },
+        { exceptionId: "open-case", createdAt: new Date("2026-08-26T00:00:00.000Z"), confidence: "low", status: "open" },
+        { exceptionId: "closed-case", createdAt: new Date("2026-08-27T00:00:00.000Z"), confidence: "medium", status: "resolved" },
+      ],
+    ]);
+    getDbMock.mockResolvedValue(db);
+
+    await expect(appRouter.createCaller(context()).varianceAi.suggestions.reviewQueue({ organisationId, branchId })).resolves.toEqual([
+      { exceptionId: "open-case", createdAt: new Date("2026-08-27T00:00:00.000Z"), confidence: "high" },
+    ]);
     expect(invokeLLMMock).not.toHaveBeenCalled();
   });
 });

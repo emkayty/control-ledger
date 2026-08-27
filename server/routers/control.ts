@@ -11,6 +11,7 @@ import {
   evidenceEvents,
   evidenceFiles,
   exceptionApprovalDecisions,
+  exceptionNoteAttachments,
   exceptionNotes,
   idempotencyKeys,
   integrationIntakeRecords,
@@ -35,6 +36,11 @@ import { invokeLLM, listLLMModels } from "../_core/llm";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const controlScope = z.object({ organisationId: z.string().uuid(), branchId: z.string().uuid() });
+const noteAttachmentInput = z.object({
+  filename: z.string().min(1).max(255),
+  contentType: z.string().min(3).max(120),
+  contentBase64: z.string().min(8).max(10_700_000),
+});
 const correlation = () => crypto.randomUUID();
 const recordId = () => crypto.randomUUID();
 
@@ -738,7 +744,10 @@ export const controlRouter = router({
       const [exception] = await db.select({ branchId: controlExceptions.branchId }).from(controlExceptions).where(and(eq(controlExceptions.id, input.exceptionId), eq(controlExceptions.organisationId, input.organisationId))).limit(1);
       if (!exception) throw new TRPCError({ code: "NOT_FOUND", message: "Exception not found." });
       await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.read });
-      return db.select().from(exceptionNotes).where(and(eq(exceptionNotes.exceptionId, input.exceptionId), eq(exceptionNotes.organisationId, input.organisationId))).orderBy(desc(exceptionNotes.createdAt));
+      const notes = await db.select().from(exceptionNotes).where(and(eq(exceptionNotes.exceptionId, input.exceptionId), eq(exceptionNotes.organisationId, input.organisationId))).orderBy(desc(exceptionNotes.createdAt));
+      if (!notes.length) return [];
+      const attachments = await db.select({ id: exceptionNoteAttachments.id, exceptionNoteId: exceptionNoteAttachments.exceptionNoteId, originalName: exceptionNoteAttachments.originalName, contentType: exceptionNoteAttachments.contentType, sizeBytes: exceptionNoteAttachments.sizeBytes, createdAt: exceptionNoteAttachments.createdAt }).from(exceptionNoteAttachments).where(and(eq(exceptionNoteAttachments.organisationId, input.organisationId), eq(exceptionNoteAttachments.exceptionId, input.exceptionId), inArray(exceptionNoteAttachments.exceptionNoteId, notes.map(note => note.id)))).orderBy(desc(exceptionNoteAttachments.createdAt));
+      return notes.map(note => ({ ...note, attachments: attachments.filter(attachment => attachment.exceptionNoteId === note.id) }));
     }),
     addNote: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid(), body: z.string().min(2).max(4000) })).mutation(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
@@ -752,6 +761,38 @@ export const controlRouter = router({
         await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.note_added", entityType: "control_exception", entityId: exception.id, correlationId });
       });
       return { id };
+    }),
+    addNoteAttachment: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid(), noteId: z.string().uuid(), attachment: noteAttachmentInput, idempotencyKey: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+      const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const [exception] = await db.select().from(controlExceptions).where(and(eq(controlExceptions.id, input.exceptionId), eq(controlExceptions.organisationId, input.organisationId))).limit(1);
+      if (!exception) throw new TRPCError({ code: "NOT_FOUND", message: "Exception not found." });
+      const [note] = await db.select({ id: exceptionNotes.id }).from(exceptionNotes).where(and(eq(exceptionNotes.id, input.noteId), eq(exceptionNotes.exceptionId, input.exceptionId), eq(exceptionNotes.organisationId, input.organisationId))).limit(1);
+      if (!note) throw new TRPCError({ code: "NOT_FOUND", message: "Investigation note not found for this variance." });
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: exception.branchId, allowed: permissions.resolve });
+      const existing = await db.select({ id: exceptionNoteAttachments.id }).from(exceptionNoteAttachments).where(and(eq(exceptionNoteAttachments.organisationId, input.organisationId), eq(exceptionNoteAttachments.exceptionNoteId, input.noteId))).limit(3);
+      if (existing.length >= 3) throw new TRPCError({ code: "BAD_REQUEST", message: "An investigation note can have up to three attachments." });
+      const fileBytes = Buffer.from(input.attachment.contentBase64.replace(/^data:.*;base64,/, ""), "base64");
+      assertEvidenceFileInput({ contentType: input.attachment.contentType, sizeBytes: fileBytes.length });
+      return getOrCreateIdempotent({
+        organisationId: input.organisationId, userId: ctx.user.id, action: "exception.note_attachment_upload", idempotencyKey: input.idempotencyKey,
+        request: { exceptionId: input.exceptionId, noteId: input.noteId, filename: input.attachment.filename, contentType: input.attachment.contentType, contentHash: sha256(input.attachment.contentBase64) },
+        execute: async () => {
+          const entityId = recordId(); const correlationId = correlation(); const safeName = input.attachment.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const { key } = await storagePut(`${input.organisationId}/${exception.branchId}/investigation-notes/${input.noteId}/${entityId}-${safeName}`, fileBytes, input.attachment.contentType);
+          await db.transaction(async transaction => {
+            await transaction.insert(exceptionNoteAttachments).values({ id: entityId, organisationId: input.organisationId, branchId: exception.branchId, exceptionId: exception.id, exceptionNoteId: input.noteId, storageKey: key, originalName: safeName, contentType: input.attachment.contentType, sizeBytes: fileBytes.length, checksum: sha256(input.attachment.contentBase64), correlationId, createdByUserId: ctx.user.id });
+            await writeAuditInTransaction(transaction, { organisationId: input.organisationId, branchId: exception.branchId, actorUserId: ctx.user.id, action: "exception.note_attachment_uploaded", entityType: "exception_note_attachment", entityId, correlationId, metadata: { exceptionId: exception.id, noteId: input.noteId, contentType: input.attachment.contentType, sizeBytes: fileBytes.length } });
+          });
+          return { entityId, correlationId };
+        },
+      });
+    }),
+    getNoteAttachment: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), attachmentId: z.string().uuid() })).query(async ({ ctx, input }) => {
+      const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });
+      const [attachment] = await db.select().from(exceptionNoteAttachments).where(and(eq(exceptionNoteAttachments.id, input.attachmentId), eq(exceptionNoteAttachments.organisationId, input.organisationId))).limit(1);
+      if (!attachment) throw new TRPCError({ code: "NOT_FOUND", message: "Investigation attachment not found." });
+      await requireScopedMembership({ userId: ctx.user.id, organisationId: input.organisationId, branchId: attachment.branchId, allowed: permissions.read });
+      return { id: attachment.id, originalName: attachment.originalName, contentType: attachment.contentType, sizeBytes: attachment.sizeBytes, url: await storageGetSignedUrl(attachment.storageKey) };
     }),
     approvalHistory: protectedProcedure.input(z.object({ organisationId: z.string().uuid(), exceptionId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database is unavailable." });

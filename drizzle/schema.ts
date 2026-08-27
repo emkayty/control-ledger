@@ -288,6 +288,30 @@ export const exceptionNotes = mysqlTable(
   table => [index("exception_notes_exception_index").on(table.exceptionId)],
 );
 
+/**
+ * Append-only controlled file links for a specific investigation note.
+ * File bytes remain in managed storage and are retrieved only after a scoped server-side check.
+ */
+export const exceptionNoteAttachments = mysqlTable(
+  "exceptionNoteAttachments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organisationId: varchar("organisationId", { length: 36 }).notNull(),
+    branchId: varchar("branchId", { length: 36 }).notNull(),
+    exceptionId: varchar("exceptionId", { length: 36 }).notNull(),
+    exceptionNoteId: varchar("exceptionNoteId", { length: 36 }).notNull(),
+    storageKey: varchar("storageKey", { length: 512 }).notNull(),
+    originalName: varchar("originalName", { length: 255 }).notNull(),
+    contentType: varchar("contentType", { length: 120 }).notNull(),
+    sizeBytes: int("sizeBytes").notNull(),
+    checksum: varchar("checksum", { length: 128 }).notNull(),
+    correlationId: varchar("correlationId", { length: 72 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+  },
+  table => [index("exception_note_attachment_scope_index").on(table.organisationId, table.branchId, table.exceptionId, table.exceptionNoteId, table.createdAt)],
+);
+
 export const exceptionApprovalDecisions = mysqlTable(
   "exceptionApprovalDecisions",
   {

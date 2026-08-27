@@ -132,3 +132,7 @@
 - [x] Audit and simplify the Variance-detail information hierarchy so case facts, the next safe action, AI assistance, and human decision controls remain focused and non-repetitive.
 - [x] Add a scoped dashboard indicator that truthfully shows the enabled AI variance-assistance policy without implying automatic action or decision authority.
 - [x] Validate responsive detail/dashboard presentation, publish the refinement, document the outcome, and synchronise the private GitHub mirror.
+- [x] Define and document safe attachment boundaries for investigation notes and a scoped saved-AI-suggestion dashboard view without creating business actions from suggestions.
+- [x] Add additive, authorised investigation-note attachment storage and a protected saved-AI-suggestion variance filter that preserve tenant/branch scope and append-only history.
+- [x] Add the focused dashboard filter, AI-badge explanatory tooltip, and calm note-attachment interface without implying automatic matching, resolution, or approval.
+- [ ] Test, verify responsively, publish, document, and synchronise the attachment and AI-suggestion enhancement.
