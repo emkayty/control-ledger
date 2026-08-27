@@ -32,3 +32,9 @@ The English/Hausa localisation dictionary includes the short active-policy title
 | 375 px mobile review | The active badge remains compact in the hero; exact case facts, optional notes, and the governed decision form stack cleanly without horizontal clipping. |
 
 > The active badge reflects the enabled policy only. No AI suggestion was requested, and the existing NGN 29,997.78 variance remains open and unresolved.
+
+## Public propagation observation
+
+The first cache-busted public dashboard check for `1000ef8a` loaded the authorised Ace/Main workspace and retained the existing values and open variance. It still showed the prior dashboard hero without the active-policy indicator, however. This was a publication-propagation delay.
+
+A second cache-busted public dashboard check rendered **AI variance assistance active · Suggestions only · people decide** in the hero and linked it to `/variances`. A matching public Variance-detail check showed the compact enabled AI card, the three-analysis usage boundary, **Investigation notes** before the separate **Controlled decision** form, and the original open NGN 29,997.78 case. No AI analysis, note, resolution proposal, decision, reconciliation, settlement, or posting was submitted during verification.

@@ -131,4 +131,4 @@
 - [x] Verify the versioned policy audit event, enabled state, empty AI suggestion history, and unchanged open NGN 29,997.78 variance; document and synchronise the activation record.
 - [x] Audit and simplify the Variance-detail information hierarchy so case facts, the next safe action, AI assistance, and human decision controls remain focused and non-repetitive.
 - [x] Add a scoped dashboard indicator that truthfully shows the enabled AI variance-assistance policy without implying automatic action or decision authority.
-- [ ] Validate responsive detail/dashboard presentation, publish the refinement, document the outcome, and synchronise the private GitHub mirror.
+- [x] Validate responsive detail/dashboard presentation, publish the refinement, document the outcome, and synchronise the private GitHub mirror.
