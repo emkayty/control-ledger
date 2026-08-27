@@ -127,3 +127,5 @@
 - [x] Audit the current disabled AI variance-assistance policy, consent record, rate bounds, data-minimisation boundary, and owner activation path.
 - [x] Strengthen safe owner-only AI re-enablement safeguards without enabling live AI processing silently or mutating any business control record.
 - [x] Simplify the Variance-centre AI policy interface for focused reading and complete validation, public verification, documentation, and GitHub synchronisation.
+- [x] Enable Ace’s variance-AI policy using the confirmed owner activation path, without requesting an analysis or changing a business workflow.
+- [x] Verify the versioned policy audit event, enabled state, empty AI suggestion history, and unchanged open NGN 29,997.78 variance; document and synchronise the activation record.
