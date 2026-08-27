@@ -81,6 +81,8 @@ After the local-error-simulation and tooltip checkpoint, a fourth cache-busted p
 
 After the custom-delay and simulation-log checkpoint, a fifth cache-busted public check at `/pharmacy-prototype?fixture-delay-log=d12de3e3` again loaded the owner-disabled policy and governed empty queue. It exposed no **Local delay** input, **Local simulation log**, clear-log action, error simulator, or fixture control. No public action was selected.
 
+After the persistent-clear-control checkpoint, a sixth cache-busted public check at `/pharmacy-prototype?fixture-clear-log=dcf77112` again loaded the owner-disabled policy and governed empty queue. It exposed no **Local simulation log**, **Clear log** action, delay input, error simulator, or fixture control. No public action was selected.
+
 ## Release conclusion
 
 The developer-only local fixture preview is suitable for exercising the non-clinical Pharmacy queue controls during development. It is explicitly isolated from protected write services and live data, and its implementation and user-facing labels are excluded from the production bundle. This validation does not change the existing controlled-pilot position or close the outstanding pharmacist, privacy, device, provider, operational-resilience, or authorised-production acceptance gates.
