@@ -149,3 +149,6 @@
 - [x] Add additive pharmacy data structures and protected, append-only batch receipt, dispensing draft, pharmacist-review, and controlled supply procedures without clinical automation.
 - [x] Upgrade the Pharmacy preview into a scoped operational workspace with real-time server validation, clear loading/recovery feedback, and no unauthorised approval or supply action.
 - [x] Test, verify, publish, document, and synchronise the controlled Pharmacy dispensing release without creating live medicine, patient, prescription, batch, stock, or supply records.
+- [x] Define and implement a read-only, scoped dispensing-request filter and sort model for status, date, and urgency without changing a Pharmacy workflow record.
+- [x] Add a compact, accessible, mobile-friendly dispensing queue control bar with clear status/date/urgency filters and sort feedback.
+- [ ] Test, verify, publish, document, and synchronise the Pharmacy queue controls without submitting any Pharmacy action.
