@@ -161,3 +161,6 @@
 - [x] Define a safe Pharmacy dispensing-request CSV schema that exports only the currently filtered, already authorised queue and excludes patient/prescription content, clinical data, and mutable storage details.
 - [x] Add a compact client-side CSV export action for the currently filtered Pharmacy request queue with safe CSV escaping and filename scoping.
 - [x] Test, verify, publish, document, and synchronise the read-only Pharmacy queue CSV export without submitting any Pharmacy action.
+- [x] Define a development-only, browser-memory Pharmacy fixture boundary that uses synthetic non-clinical requests and cannot call protected write procedures or persist a live record.
+- [x] Add a deterministic local fixture queue control for exercising request filters, urgency/order logic, and current-view CSV export during development only.
+- [x] Test and document fixture isolation, synthetic-data labelling, filter/search coverage, and CSV contents without creating any Pharmacy, patient, prescription, stock, approval, or supply data.

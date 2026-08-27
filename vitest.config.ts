@@ -10,6 +10,7 @@ export default defineConfig({
       "@": path.resolve(templateRoot, "client", "src"),
       "@shared": path.resolve(templateRoot, "shared"),
       "@assets": path.resolve(templateRoot, "attached_assets"),
+      "$pharmacy-fixture-controls": path.resolve(templateRoot, "client", "src", "production", "PharmacyFixtureControls.tsx"),
     },
   },
   test: {
