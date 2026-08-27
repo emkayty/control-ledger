@@ -178,3 +178,6 @@
 - [x] Expand and run automated stress, negative-path, access-boundary, export-safety, and responsive validation without creating or mutating operational data.
 - [x] Produce a final controlled-pilot production-readiness record that distinguishes completed application hardening from outstanding pharmacist, privacy, provider, hosting, device, and operational acceptance gates.
 - [x] Publish, cache-bust verify, and synchronise the production-readiness consolidation without creating or changing financial, variance, Pharmacy, patient, prescription, stock, approval, supply, or audit records.
+- [x] Conduct and record an authorised read-only desktop acceptance review of the published control desk, receivables, evidence, operations, collections, ledger, variances, access, audit, and Pharmacy routes without invoking a workflow action.
+- [x] Conduct and record an authorised read-only mobile acceptance review of the published control desk, navigation, operational workspaces, ledger, variances, and Pharmacy routes without invoking a workflow action.
+- [x] Reconcile the results with the existing broader production, real-device, provider, pharmacist, privacy, and resilience gates without claiming unauthorised or unperformed acceptance evidence.
