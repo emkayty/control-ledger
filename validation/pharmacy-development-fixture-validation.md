@@ -63,6 +63,8 @@ The cache-busted public route `/pharmacy-prototype?fixture-isolation=343e787f` w
 
 After the switch-and-skeleton checkpoint, a second cache-busted public check at `/pharmacy-prototype?fixture-switch=3b94821a` again loaded the owner-disabled policy and governed empty queue. It exposed no **Local test queue** switch, no **Preparing local test queue** skeleton, and no synthetic fixture wording. No public action was selected in either check.
 
+After the progress-and-header-badge checkpoint, a third cache-busted public check at `/pharmacy-prototype?fixture-progress=7c0b2a02` again loaded the owner-disabled policy and governed empty queue. It exposed no **Local test queue active** header badge, no **Preparing local test queue** progress indicator, no percentage-ready text, and no fixture control. No public action was selected.
+
 ## Release conclusion
 
 The developer-only local fixture preview is suitable for exercising the non-clinical Pharmacy queue controls during development. It is explicitly isolated from protected write services and live data, and its implementation and user-facing labels are excluded from the production bundle. This validation does not change the existing controlled-pilot position or close the outstanding pharmacist, privacy, device, provider, operational-resilience, or authorised-production acceptance gates.
