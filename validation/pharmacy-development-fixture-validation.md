@@ -53,7 +53,9 @@ Focused coverage verifies the unchecked and checked switch states, local prepara
 
 ## Public deployment verification
 
-The cache-busted public route `/pharmacy-prototype?fixture-isolation=343e787f` was checked after the checkpoint completed. The page finished loading the owner-disabled Pharmacy policy, zero active pharmacist authorisations, the empty scoped queue, the read-only controls, and the disabled empty-state CSV action. It contained neither **Load local test queue** nor any local-preview or synthetic-fixture wording. No public action was selected.
+The cache-busted public route `/pharmacy-prototype?fixture-isolation=343e787f` was checked after the checkpoint completed. The page finished loading the owner-disabled Pharmacy policy, zero active pharmacist authorisations, the empty scoped queue, the read-only controls, and the disabled empty-state CSV action. It contained neither **Load local test queue** nor any local-preview or synthetic-fixture wording.
+
+After the switch-and-skeleton checkpoint, a second cache-busted public check at `/pharmacy-prototype?fixture-switch=3b94821a` again loaded the owner-disabled policy and governed empty queue. It exposed no **Local test queue** switch, no **Preparing local test queue** skeleton, and no synthetic fixture wording. No public action was selected in either check.
 
 ## Release conclusion
 
