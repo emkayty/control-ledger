@@ -11,3 +11,7 @@ The cache-busted live Operations workspace completed its read-only load without 
 | Production route contains no development fixture, simulation, or debug-log UI. | No current release risk observed. | Retain automated production-bundle scans and final cache-busted public verification. |
 
 This is an implementation and usability audit only. It does not constitute pharmacist, provider, privacy, legal, device, or operational-acceptance approval.
+
+## Public propagation observation
+
+The first three cache-busted public reads after checkpoint `f7252f8f` still served the prior control-desk copy, including the visible `Release 1–4` chain labels. They did not expose any local Pharmacy fixture, simulated-error, debug-log, synthetic-data, or other developer-only interface. A delayed fourth cache-busted read completed after the deployment-success notice and displayed the new **One accountable control chain** copy, its four operational labels, and the accessible organisation/branch selector names. It continued to expose no local fixture or simulation UI. No public workflow control was selected.

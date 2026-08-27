@@ -177,4 +177,4 @@
 - [x] Apply only evidence-led, low-risk production UX and code-structure consolidation improvements that preserve tenant scope, append-only control evidence, exact-value logic, human approval, disabled-by-default Pharmacy policy, and existing records.
 - [x] Expand and run automated stress, negative-path, access-boundary, export-safety, and responsive validation without creating or mutating operational data.
 - [x] Produce a final controlled-pilot production-readiness record that distinguishes completed application hardening from outstanding pharmacist, privacy, provider, hosting, device, and operational acceptance gates.
-- [ ] Publish, cache-bust verify, and synchronise the production-readiness consolidation without creating or changing financial, variance, Pharmacy, patient, prescription, stock, approval, supply, or audit records.
+- [x] Publish, cache-bust verify, and synchronise the production-readiness consolidation without creating or changing financial, variance, Pharmacy, patient, prescription, stock, approval, supply, or audit records.
