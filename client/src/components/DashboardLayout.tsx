@@ -4,7 +4,7 @@ import { ControlScopeProvider } from "@/contexts/ControlScopeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { ControlScope } from "@/lib/control";
 import { trpc } from "@/lib/trpc";
-import { AlertTriangle, ArrowUpRight, BookOpenCheck, Building2, CircleUserRound, FileCheck2, History, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, Sparkles, UsersRound, Warehouse, WalletCards } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, BookOpenCheck, Building2, CircleUserRound, FileCheck2, History, LayoutDashboard, LogOut, Menu, Pill, ReceiptText, ShieldCheck, Sparkles, UsersRound, Warehouse, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
@@ -17,7 +17,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   const { t } = useLanguage();
   const navigation = [
-    { href: "/", label: t("controlDesk"), icon: LayoutDashboard }, { href: "/receivables", label: t("receivables"), icon: ReceiptText }, { href: "/evidence", label: t("evidenceIntake"), icon: FileCheck2 }, { href: "/operations", label: t("operations"), icon: Warehouse }, { href: "/collections", label: t("collections"), icon: WalletCards }, { href: "/ledger", label: t("ledger"), icon: BookOpenCheck }, { href: "/variances", label: t("variances"), icon: AlertTriangle }, { href: "/access", label: t("peopleAccess"), icon: UsersRound }, { href: "/audit", label: t("auditTrail"), icon: History },
+    { href: "/", label: t("controlDesk"), icon: LayoutDashboard }, { href: "/receivables", label: t("receivables"), icon: ReceiptText }, { href: "/evidence", label: t("evidenceIntake"), icon: FileCheck2 }, { href: "/operations", label: t("operations"), icon: Warehouse }, { href: "/collections", label: t("collections"), icon: WalletCards }, { href: "/ledger", label: t("ledger"), icon: BookOpenCheck }, { href: "/variances", label: t("variances"), icon: AlertTriangle }, { href: "/pharmacy-prototype", label: t("pharmacyPrototype"), icon: Pill }, { href: "/access", label: t("peopleAccess"), icon: UsersRound }, { href: "/audit", label: t("auditTrail"), icon: History },
   ];
   return <nav className="space-y-1 px-3 py-4" aria-label="Primary navigation">
     {navigation.map(item => {
