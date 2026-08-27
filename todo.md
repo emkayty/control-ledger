@@ -181,5 +181,6 @@
 - [x] Conduct and record an authorised read-only desktop acceptance review of the published control desk, receivables, evidence, operations, collections, ledger, variances, access, audit, and Pharmacy routes without invoking a workflow action.
 - [x] Conduct and record an authorised read-only mobile acceptance review of the published control desk, navigation, operational workspaces, ledger, variances, and Pharmacy routes without invoking a workflow action.
 - [x] Reconcile the results with the existing broader production, real-device, provider, pharmacist, privacy, and resilience gates without claiming unauthorised or unperformed acceptance evidence.
+- [x] Open and document the existing authorised receipt only through its protected preview path and review the existing editable extraction proposal without recording, applying, downloading, editing, or changing any evidence or workflow record.
 - [x] Perform and record a read-only mobile review of the published Exceptions workspace, confirming the open variance without submitting a note, attachment, resolution, or approval.
 - [x] Perform and record a read-only mobile review of the published Audit trail, confirming scoped material-action history renders without opening a workflow action.
