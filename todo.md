@@ -160,4 +160,4 @@
 - [x] Publish, publicly verify, document, and synchronise the consolidation milestone without changing live financial, variance, pharmacy, patient, prescription, or stock data.
 - [x] Define a safe Pharmacy dispensing-request CSV schema that exports only the currently filtered, already authorised queue and excludes patient/prescription content, clinical data, and mutable storage details.
 - [x] Add a compact client-side CSV export action for the currently filtered Pharmacy request queue with safe CSV escaping and filename scoping.
-- [ ] Test, verify, publish, document, and synchronise the read-only Pharmacy queue CSV export without submitting any Pharmacy action.
+- [x] Test, verify, publish, document, and synchronise the read-only Pharmacy queue CSV export without submitting any Pharmacy action.
