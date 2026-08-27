@@ -37,3 +37,9 @@ English and Hausa labels were updated for the shorter activation sequence. The c
 | Disabled policy interface | Reviewed at desktop and 375 px mobile widths. The card is compact, the decision form remains separate, and no policy change was submitted. |
 
 > **Live activation boundary:** No policy enablement or analysis request was made during development or validation. The owner must still make the explicit in-product confirmation after this version is published.
+
+## Public propagation observation
+
+The first cache-busted public check for `ceb73677` loaded the authenticated Variance centre and preserved the disabled policy, the open NGN 29,997.78 case, and the separate human controls. It still displayed the previous, more verbose AI card, however, rather than the new focused **Enable AI assistance** entry. This was a normal publication-propagation delay.
+
+A second cache-busted check after the deployment-success notice rendered the current focused policy card. It shows the compact disabled state, a single **Enable AI assistance** owner action, the proposal-only boundary, and the concise human-authority explanation. The page continues to show the untouched open NGN 29,997.78 variance, an empty decision form, and no AI suggestion. No activation, analysis request, evidence action, settlement, resolution, or approval was submitted during public verification.

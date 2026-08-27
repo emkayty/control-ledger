@@ -126,4 +126,4 @@
 - [x] Re-run validation and cache-busted public checks; document the sanitation outcome, publish it, and synchronise the private GitHub mirror.
 - [x] Audit the current disabled AI variance-assistance policy, consent record, rate bounds, data-minimisation boundary, and owner activation path.
 - [x] Strengthen safe owner-only AI re-enablement safeguards without enabling live AI processing silently or mutating any business control record.
-- [ ] Simplify the Variance-centre AI policy interface for focused reading and complete validation, public verification, documentation, and GitHub synchronisation.
+- [x] Simplify the Variance-centre AI policy interface for focused reading and complete validation, public verification, documentation, and GitHub synchronisation.
