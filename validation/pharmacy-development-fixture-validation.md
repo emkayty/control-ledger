@@ -45,6 +45,10 @@ The final read-only database check reported zero records in every live Pharmacy 
 | Pharmacy supply events | 0 |
 | Control exception `8338df03-8947-4623-a1e8-b1d75c14a42f` | `open`; impact minor units `2999778`; `resolvedAt = NULL` |
 
+## Public deployment verification
+
+The cache-busted public route `/pharmacy-prototype?fixture-isolation=343e787f` was checked after the checkpoint completed. The page finished loading the owner-disabled Pharmacy policy, zero active pharmacist authorisations, the empty scoped queue, the read-only controls, and the disabled empty-state CSV action. It contained neither **Load local test queue** nor any local-preview or synthetic-fixture wording. No public action was selected.
+
 ## Release conclusion
 
 The developer-only local fixture preview is suitable for exercising the non-clinical Pharmacy queue controls during development. It is explicitly isolated from protected write services and live data, and its implementation and user-facing labels are excluded from the production bundle. This validation does not change the existing controlled-pilot position or close the outstanding pharmacist, privacy, device, provider, operational-resilience, or authorised-production acceptance gates.
