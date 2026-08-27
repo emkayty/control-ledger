@@ -135,4 +135,4 @@
 - [x] Define and document safe attachment boundaries for investigation notes and a scoped saved-AI-suggestion dashboard view without creating business actions from suggestions.
 - [x] Add additive, authorised investigation-note attachment storage and a protected saved-AI-suggestion variance filter that preserve tenant/branch scope and append-only history.
 - [x] Add the focused dashboard filter, AI-badge explanatory tooltip, and calm note-attachment interface without implying automatic matching, resolution, or approval.
-- [ ] Test, verify responsively, publish, document, and synchronise the attachment and AI-suggestion enhancement.
+- [x] Test, verify responsively, publish, document, and synchronise the attachment and AI-suggestion enhancement.

@@ -33,3 +33,11 @@ Investigation notes now allow an authorised user to choose up to three optional 
 | Responsive review | Desktop and 375 px checks show the AI-suggestion filter remains compact in the dashboard and the collapsed notes section keeps the case and human decision controls uncluttered. |
 
 No real note, attachment, AI analysis, financial record, reconciliation, resolution, decision, journal, or settlement was created during implementation or validation. The open NGN 29,997.78 variance remains unchanged.
+
+## Public propagation observation
+
+The first cache-busted public dashboard check for `f4fd3713` retained the enabled AI policy badge and all existing scoped facts, but still served the previous Priority exceptions header without the new **AI suggestions** filter. This was a normal publication-propagation delay.
+
+A second cache-busted dashboard check rendered the current Priority exceptions controls: **All priority** and **AI suggestions**. The active-policy badge remains present beside its explanatory tooltip trigger. The filter shows no count because the current open case has zero saved AI suggestions; it does not invoke a model to populate this view.
+
+The matching cache-busted public Variance-detail check rendered **Investigation notes** with the optional **Attach files** entry and its file-type, count, and size boundary. It retained the compact AI card above it and the separate controlled-decision form below it. No note, attachment, AI analysis, resolution proposal, decision, reconciliation, settlement, or posting was submitted during verification.
