@@ -139,4 +139,4 @@
 - [x] Define and document safe signed-thumbnail, upload-progress, and read-only PDF variance-report boundaries for scoped notes, attachments, and stored AI suggestions.
 - [x] Add authorised image-preview and variance-report data helpers that exclude raw storage keys/URLs and do not create or alter a control record.
 - [x] Add focused attachment thumbnail/progress feedback and a scoped variance PDF export action to the detail interface.
-- [ ] Test, verify responsively, publish, document, and synchronise the preview, feedback, and PDF-export enhancement.
+- [x] Test, verify responsively, publish, document, and synchronise the preview, feedback, and PDF-export enhancement.

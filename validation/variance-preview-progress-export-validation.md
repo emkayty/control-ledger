@@ -31,3 +31,9 @@ The selected Variance detail has a compact **Export PDF report** action. The cli
 | Responsive preview | Desktop and 375 px Variance-detail checks show the export action remains visible without crowding case facts, AI controls, notes, or human decision controls. |
 
 No live attachment was uploaded, no thumbnail request was generated for a new file, and no PDF report was downloaded during validation. No AI analysis, financial record, reconciliation, resolution, approval, settlement, journal, or variance state was changed; the NGN 29,997.78 variance remains open.
+
+## Public propagation observation
+
+The first cache-busted public check for `ce1e9bae` retained the open case, enabled AI-policy state, attachment entry, and controlled-decision boundary, but still served the previous header without **Export PDF report**. This is recorded as a normal publication-propagation delay. Public verification remains open until a later cache-busted check shows the current action.
+
+After the deployment-success notice, a second cache-busted public check displayed **Export PDF report** above the scoped NGN 29,997.78 value. It also retained the separate request-only AI assistant, collapsed investigation-note entry with file boundary, and independent decision form. The action was observed only; it was not clicked, so no browser download, query-side file access, or mutation was initiated. This completes the public propagation check for this workstream.
