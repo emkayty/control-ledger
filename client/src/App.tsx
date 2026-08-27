@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense } from "react";
+import React, { lazy, Suspense } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import ControlDashboard from "@/pages/ControlDashboard";
 import NotFound from "@/pages/NotFound";
@@ -8,7 +9,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
-function PageFallback() { return <div className="grid min-h-[50vh] place-items-center text-sm font-semibold text-muted-foreground">Loading controlled workspace…</div>; }
+export function PageFallback() { return <section role="status" aria-label="Preparing controlled workspace" className="mx-auto grid min-h-[50vh] w-full max-w-7xl content-start gap-6 pt-2"><div className="rounded-[1.8rem] border border-slate-200/80 bg-[#071d22] p-6 sm:p-8"><p className="text-xs font-extrabold uppercase tracking-[0.16em] text-teal-200">Scoped control workspace</p><p className="mt-3 text-xl font-extrabold tracking-tight text-white">Preparing your workspace</p><p className="mt-2 text-sm text-slate-300">Loading the selected control view. No action is being submitted.</p></div><div className="grid gap-4 md:grid-cols-3"><Skeleton className="h-32 rounded-3xl" /><Skeleton className="h-32 rounded-3xl" /><Skeleton className="h-32 rounded-3xl" /></div><Skeleton className="h-48 rounded-3xl" /></section>; }
 function ProtectedPage({ children }: { children: React.ReactNode }) { return <DashboardLayout><Suspense fallback={<PageFallback />}>{children}</Suspense></DashboardLayout>; }
 const LedgerPage = lazy(() => import("@/pages/LedgerPage"));
 const VariancesPage = lazy(() => import("@/pages/VariancesPage"));

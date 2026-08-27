@@ -173,3 +173,8 @@
 - [x] Add a bounded development-only custom local delay input for slow-connection fixture preparation without delaying or intercepting live Pharmacy services.
 - [x] Add, test, verify, document, publish, and synchronise a browser-memory debug log of simulated fixture preparation failures, preserving production exclusion and zero live data changes.
 - [x] Make the development-only local simulation-log Clear log action consistently visible, disabled when empty, and verify it only clears browser-memory simulated error history.
+- [x] Audit shipped production routes, navigation, empty states, accessibility cues, and copy for developer-only exposure, workflow noise, and practical operator clarity.
+- [x] Apply only evidence-led, low-risk production UX and code-structure consolidation improvements that preserve tenant scope, append-only control evidence, exact-value logic, human approval, disabled-by-default Pharmacy policy, and existing records.
+- [x] Expand and run automated stress, negative-path, access-boundary, export-safety, and responsive validation without creating or mutating operational data.
+- [x] Produce a final controlled-pilot production-readiness record that distinguishes completed application hardening from outstanding pharmacist, privacy, provider, hosting, device, and operational acceptance gates.
+- [ ] Publish, cache-bust verify, and synchronise the production-readiness consolidation without creating or changing financial, variance, Pharmacy, patient, prescription, stock, approval, supply, or audit records.
