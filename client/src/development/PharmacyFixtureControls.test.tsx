@@ -46,10 +46,11 @@ describe("PharmacyFixtureControls", () => {
   });
 
   it("labels the pulsing local preparation skeleton with truthful progress and no provider request", () => {
-    render(<FixtureQueueLoadingSkeleton progress={64} />);
+    render(<FixtureQueueLoadingSkeleton progress={64} delayMs={1200} />);
 
     expect(screen.getByRole("status").textContent).toMatch(/No Pharmacy service is called/i);
     expect(screen.getByText("64% ready")).toBeTruthy();
+    expect(screen.getByText(/Local delay: 1,200 ms/i)).toBeTruthy();
     expect(screen.getByRole("progressbar", { name: "Local test queue preparation" }).getAttribute("aria-valuenow")).toBe("64");
     expect(document.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
   });
@@ -77,6 +78,29 @@ describe("PharmacyFixtureControls", () => {
 
     expect(screen.getByRole("alert").textContent).toMatch(/Simulated offline condition.*No connection was attempted.*no Pharmacy service.*data change occurred/i);
     expect(onLoad).not.toHaveBeenCalled();
+    expect(screen.getByRole("log", { name: "Local simulated error log" }).textContent).toMatch(/offline simulated after 180 ms/i);
+  });
+
+  it("uses a bounded custom local delay without delaying a live service", () => {
+    vi.useFakeTimers();
+    const onLoad = vi.fn();
+    render(<PharmacyFixtureControls fixtureMode={false} onLoad={onLoad} onClear={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText("Local fixture delay in milliseconds"), { target: { value: "1200" } });
+    fireEvent.click(screen.getByRole("switch", { name: "Use local synthetic test queue" }));
+    expect(screen.getByText(/Local delay: 1,200 ms/i)).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1199));
+    expect(onLoad).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(onLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds local delay input and keeps simulated failure history browser-local", () => {
+    render(<PharmacyFixtureControls fixtureMode={false} onLoad={vi.fn()} onClear={vi.fn()} />);
+    const delayInput = screen.getByLabelText("Local fixture delay in milliseconds") as HTMLInputElement;
+    fireEvent.change(delayInput, { target: { value: "99999" } });
+    expect(delayInput.value).toBe("5000");
+    expect(screen.getByRole("log", { name: "Local simulated error log" }).textContent).toMatch(/No local simulated errors recorded/i);
   });
 
   it("keeps local error recovery controls separate from operating actions", () => {

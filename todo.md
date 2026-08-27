@@ -170,3 +170,5 @@
 - [x] Add, test, verify, document, publish, and synchronise a persistent development-only header badge when the browser-memory local test queue is active, while retaining production exclusion.
 - [x] Add development-only local fixture preparation error-state simulation that never performs a real network request, provider validation, or Pharmacy mutation.
 - [x] Add, test, verify, document, publish, and synchronise an accessible synthetic-data explanation tooltip for the development-only local-queue header badge while preserving production exclusion.
+- [x] Add a bounded development-only custom local delay input for slow-connection fixture preparation without delaying or intercepting live Pharmacy services.
+- [x] Add, test, verify, document, publish, and synchronise a browser-memory debug log of simulated fixture preparation failures, preserving production exclusion and zero live data changes.
