@@ -140,3 +140,4 @@
 - [x] Add authorised image-preview and variance-report data helpers that exclude raw storage keys/URLs and do not create or alter a control record.
 - [x] Add focused attachment thumbnail/progress feedback and a scoped variance PDF export action to the detail interface.
 - [x] Test, verify responsively, publish, document, and synchronise the preview, feedback, and PDF-export enhancement.
+- [x] Assess current Control Ledger coverage and define a module-level readiness blueprint for pharmacy operations, a complete school fee-collection module, and a shared multi-industry control core.
