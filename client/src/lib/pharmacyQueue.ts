@@ -6,6 +6,7 @@ export type PharmacyQueueRecord = {
   id: string;
   status: PharmacyRequestStatus;
   createdAt: Date | string;
+  sourceReference?: string;
 };
 
 export type PharmacyQueueFilters = {
@@ -13,6 +14,7 @@ export type PharmacyQueueFilters = {
   urgency: "all" | PharmacyRequestUrgency;
   from?: string;
   to?: string;
+  search?: string;
   sort: PharmacyQueueSort;
 };
 
@@ -42,8 +44,10 @@ function isWithinDate(record: PharmacyQueueRecord, from?: string, to?: string) {
 }
 
 export function filterAndSortPharmacyQueue<T extends PharmacyQueueRecord>(records: T[], filters: PharmacyQueueFilters, now = new Date()) {
+  const query = filters.search?.trim().toLowerCase() ?? "";
   return records
     .filter(record => (filters.status === "all" || record.status === filters.status) && isWithinDate(record, filters.from, filters.to))
+    .filter(record => !query || record.sourceReference?.toLowerCase().includes(query))
     .filter(record => filters.urgency === "all" || pharmacyRequestUrgency(record, now) === filters.urgency)
     .sort((left, right) => {
       const leftTime = timestamp(left.createdAt);

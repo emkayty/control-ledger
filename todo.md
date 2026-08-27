@@ -152,3 +152,9 @@
 - [x] Define and implement a read-only, scoped dispensing-request filter and sort model for status, date, and urgency without changing a Pharmacy workflow record.
 - [x] Add a compact, accessible, mobile-friendly dispensing queue control bar with clear status/date/urgency filters and sort feedback.
 - [x] Test, verify, publish, document, and synchronise the Pharmacy queue controls without submitting any Pharmacy action.
+- [x] Define a privacy-preserving Pharmacy search scope that does not introduce patient-name or prescription-identifier processing without explicit data-governance, pharmacist, and compliance prerequisites.
+- [x] Audit and reconcile current Control Ledger workflows, permissions, append-only audit logic, interface hierarchy, localisation, exports, and shared-core/domain-pack alignment against the stated business plan.
+- [x] Implement only verified, low-risk consolidation and usability improvements, including a safe scoped dispensing-request reference search where appropriate.
+- [x] Stress-test critical control paths, boundary handling, exact-value logic, concurrency/idempotency assumptions, accessibility, responsive behaviour, and production package health without creating live operating records.
+- [x] Produce a standards-aware market-readiness, Blue Ocean, and Business Model Canvas assessment that distinguishes completed product capabilities from genuine external governance and launch gates.
+- [ ] Publish, publicly verify, document, and synchronise the consolidation milestone without changing live financial, variance, pharmacy, patient, prescription, or stock data.

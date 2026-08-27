@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { PharmacyApprovalFeedback } from "./PharmacyPrototypePage";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { PharmacyApprovalFeedback, QueueToolbar } from "./PharmacyPrototypePage";
 
 afterEach(cleanup);
 
@@ -19,5 +19,15 @@ describe("pharmacy real-time approval feedback", () => {
 
     rerender(<PharmacyApprovalFeedback loading={false} eligible reason="Batch is active, in date, and sufficient." />);
     expect(screen.getByText("Batch is currently eligible for pharmacist review.")).toBeTruthy();
+  });
+
+  it("searches only through the compact controlled-request-reference filter", () => {
+    const onChange = vi.fn();
+    render(<QueueToolbar count={0} filters={{ status: "all", urgency: "all", sort: "urgency" }} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText("Find by Control Ledger request reference"), { target: { value: "REQ-000427" } });
+
+    expect(onChange).toHaveBeenCalledWith({ search: "REQ-000427" });
+    expect(screen.getByText(/does not search or store patient names, prescription identifiers/i)).toBeTruthy();
   });
 });

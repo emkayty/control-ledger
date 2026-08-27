@@ -26,4 +26,12 @@ describe("pharmacy dispensing safety boundary", () => {
 
     await expect(appRouter.createCaller(context).pharmacy.policy.enable({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f9d9c3", acknowledgement: "ENABLE DISPENSING", noticeVersion: pharmacySafety.POLICY_NOTICE_VERSION, idempotencyKey: "pharmacy-policy-phrase-test" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  it("rejects non-reference characters before executing a Pharmacy request search", async () => {
+    const context = { user: { id: 1, openId: "owner", email: "owner@example.com", name: "Owner", loginMethod: "manus", role: "user", createdAt: now, updatedAt: now, lastSignedIn: now }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] } satisfies TrpcContext;
+
+    await expect(appRouter.createCaller(context).pharmacy.dispensing.list({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f9d9c3", search: "PATIENT NAME" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(appRouter.createCaller(context).pharmacy.dispensing.list({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f9d9c3", search: "RX-93428" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(appRouter.createCaller(context).pharmacy.dispensing.list({ organisationId: "a041b5a2-2a3e-49cc-a9aa-2c7b8a6ea5d0", branchId: "f894a6a4-b488-48f1-9e45-dba4f9d9c3", search: "REQ-12%" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 });

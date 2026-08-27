@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, like, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditEvents,
@@ -235,27 +235,29 @@ export const pharmacyRouter = router({
     }),
   }),
   dispensing: router({
-    list: protectedProcedure.input(scopeInput).query(async ({ ctx, input }) => {
+    list: protectedProcedure.input(scopeInput.extend({ limit: z.number().int().min(1).max(100).default(50), cursor: z.coerce.date().optional(), search: z.string().trim().max(24).regex(/^REQ-[A-Za-z0-9-]*$/i, "Search only accepts a Control Ledger request reference beginning REQ-.").optional() })).query(async ({ ctx, input }) => {
       const { db } = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.read });
-      const requests = await db.select().from(pharmacyDispensingRequests).where(and(eq(pharmacyDispensingRequests.organisationId, input.organisationId), eq(pharmacyDispensingRequests.branchId, input.branchId))).orderBy(desc(pharmacyDispensingRequests.createdAt));
-      if (!requests.length) return [];
+      const requestRows = await db.select().from(pharmacyDispensingRequests).where(and(eq(pharmacyDispensingRequests.organisationId, input.organisationId), eq(pharmacyDispensingRequests.branchId, input.branchId), input.search ? like(pharmacyDispensingRequests.sourceReference, `${input.search.toUpperCase()}%`) : undefined, input.cursor ? lt(pharmacyDispensingRequests.createdAt, input.cursor) : undefined)).orderBy(desc(pharmacyDispensingRequests.createdAt)).limit(input.limit + 1);
+      const hasMore = requestRows.length > input.limit;
+      const requests = requestRows.slice(0, input.limit);
+      if (!requests.length) return { items: [], nextCursor: null };
       const requestIds = requests.map(request => request.id);
       const [lines, decisions] = await Promise.all([
         db.select({ id: pharmacyDispensingLines.id, dispensingRequestId: pharmacyDispensingLines.dispensingRequestId, productId: pharmacyDispensingLines.productId, stockLotId: pharmacyDispensingLines.stockLotId, quantity: pharmacyDispensingLines.quantity, productName: products.name, batchCode: stockLots.batchCode, expiryAt: stockLots.expiryAt }).from(pharmacyDispensingLines).innerJoin(products, eq(products.id, pharmacyDispensingLines.productId)).innerJoin(stockLots, eq(stockLots.id, pharmacyDispensingLines.stockLotId)).where(inArray(pharmacyDispensingLines.dispensingRequestId, requestIds)),
         db.select().from(pharmacyDispensingDecisions).where(inArray(pharmacyDispensingDecisions.dispensingRequestId, requestIds)).orderBy(desc(pharmacyDispensingDecisions.createdAt)),
       ]);
-      return requests.map(request => ({ ...request, lines: lines.filter(line => line.dispensingRequestId === request.id), decisions: decisions.filter(decision => decision.dispensingRequestId === request.id) }));
+      return { items: requests.map(request => ({ ...request, lines: lines.filter(line => line.dispensingRequestId === request.id), decisions: decisions.filter(decision => decision.dispensingRequestId === request.id) })), nextCursor: hasMore ? requests.at(-1)?.createdAt ?? null : null };
     }),
-    createDraft: protectedProcedure.input(scopeInput.extend({ sourceReference: z.string().min(3).max(128), lines: z.array(lineInput).min(1).max(20) }).merge(idempotencyInput)).mutation(async ({ ctx, input }) => {
+    createDraft: protectedProcedure.input(scopeInput.extend({ lines: z.array(lineInput).min(1).max(20) }).merge(idempotencyInput)).mutation(async ({ ctx, input }) => {
       const { db } = await scopedDb({ ...input, userId: ctx.user.id, allowed: permissions.manageOrders });
       await activePolicy(db, input.organisationId, input.branchId);
       await assertLinesEligible(db, input);
       return idempotent({ organisationId: input.organisationId, userId: ctx.user.id, action: "pharmacy.dispensing.create_draft", idempotencyKey: input.idempotencyKey, request: input, execute: async () => {
-        const entityId = recordId(); const correlationId = correlation();
+        const entityId = recordId(); const correlationId = correlation(); const sourceReference = `REQ-${entityId.replace(/-/g, "").slice(0, 16).toUpperCase()}`;
         await db.transaction(async transaction => {
-          await transaction.insert(pharmacyDispensingRequests).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, sourceReference: input.sourceReference.trim(), status: "draft", correlationId, createdByUserId: ctx.user.id });
+          await transaction.insert(pharmacyDispensingRequests).values({ id: entityId, organisationId: input.organisationId, branchId: input.branchId, sourceReference, status: "draft", correlationId, createdByUserId: ctx.user.id });
           await transaction.insert(pharmacyDispensingLines).values(input.lines.map(line => ({ id: recordId(), dispensingRequestId: entityId, organisationId: input.organisationId, branchId: input.branchId, productId: line.productId, stockLotId: line.stockLotId, quantity: line.quantity })));
-          await writeAudit(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "pharmacy.dispensing_draft_created", entityType: "pharmacy_dispensing_request", entityId, correlationId, metadata: { sourceReference: input.sourceReference.trim(), lineCount: input.lines.length, clinicalDataStored: false } });
+          await writeAudit(transaction, { organisationId: input.organisationId, branchId: input.branchId, actorUserId: ctx.user.id, action: "pharmacy.dispensing_draft_created", entityType: "pharmacy_dispensing_request", entityId, correlationId, metadata: { sourceReference, lineCount: input.lines.length, clinicalDataStored: false } });
         });
         return { entityId, correlationId };
       }});
